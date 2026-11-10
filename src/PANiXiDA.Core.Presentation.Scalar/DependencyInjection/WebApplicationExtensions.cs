@@ -1,3 +1,6 @@
+using System.Net.Mime;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using PANiXiDA.Core.Presentation.Scalar.Configurations;
 using PANiXiDA.Core.ApiDocumentation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -41,6 +44,22 @@ public static class WebApplicationExtensions
             throw new InvalidOperationException("No API document sources were registered. Register HTTP, SignalR or Kafka documentation before UseApiDocumentation.");
         }
 
+        MapAsyncApi(app, sources);
+        var descriptions = app.Services.GetService<IApiDescriptionGroupCollectionProvider>();
+        MapOperationOrdering(app, settings, descriptions);
+
+        if (!string.IsNullOrWhiteSpace(settings.Favicon))
+        {
+            app.MapStaticAssets().ShortCircuit();
+        }
+
+        MapScalar(app, settings, catalog, descriptions);
+        applicationBuilder.Properties[MappedKey] = true;
+        return app;
+    }
+
+    private static void MapAsyncApi(WebApplication app, IApiDocumentSource[] sources)
+    {
         foreach (var source in sources.OfType<IAsyncApiDocumentSource>())
         {
             foreach (var document in source.GetDocuments())
@@ -60,11 +79,11 @@ public static class WebApplicationExtensions
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(settings.Favicon))
-        {
-            app.MapStaticAssets().ShortCircuit();
-        }
+    }
 
+    private static void MapScalar(WebApplication app, ApiDocumentationOptions settings, ApiDocumentCatalog catalog,
+        IApiDescriptionGroupCollectionProvider? descriptions)
+    {
         app.MapScalarApiReference(options =>
         {
             if (!string.IsNullOrWhiteSpace(settings.Title))
@@ -80,7 +99,14 @@ public static class WebApplicationExtensions
             if (settings.SortOperations && options.OperationSorter is null &&
                 string.IsNullOrWhiteSpace(options.JavaScriptConfiguration))
             {
-                options.SortOperationsByMethod();
+                if (descriptions is null)
+                {
+                    options.SortOperationsByMethod();
+                }
+                else
+                {
+                    options.WithJavaScriptConfiguration(ScalarOperationOrdering.ConfigurationPath.TrimStart('/'));
+                }
             }
 
             foreach (var document in catalog.GetDocuments())
@@ -95,7 +121,21 @@ public static class WebApplicationExtensions
                 }
             }
         });
-        applicationBuilder.Properties[MappedKey] = true;
-        return app;
+    }
+
+    private static void MapOperationOrdering(WebApplication app, ApiDocumentationOptions settings,
+        IApiDescriptionGroupCollectionProvider? descriptions)
+    {
+        if (!settings.SortOperations || descriptions is null)
+        {
+            return;
+        }
+
+        RequestDelegate handler = context =>
+        {
+            context.Response.ContentType = MediaTypeNames.Text.JavaScript;
+            return context.Response.WriteAsync(ScalarOperationOrdering.CreateConfiguration(descriptions), context.RequestAborted);
+        };
+        app.MapGet(ScalarOperationOrdering.ConfigurationPath, handler).ExcludeFromDescription();
     }
 }

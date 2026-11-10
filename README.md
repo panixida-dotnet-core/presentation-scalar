@@ -41,7 +41,7 @@ The `/scalar` reference lists documents by module, transport and version. AsyncA
 }
 ```
 
-Without `Enabled`, documentation is exposed only in Development. Put the favicon in the web host's `wwwroot` and publish its static web assets. `SortOperations` defaults to `true`; explicit Scalar sorting settings are preserved. HTTP-specific ordering remains in the HTTP adapter.
+Without `Enabled`, documentation is exposed only in Development. Put the favicon in the web host's `wwwroot` and publish its static web assets. `SortOperations` defaults to `true`; explicit Scalar sorting settings are preserved. When ASP.NET Core API Explorer is available, HTTP operations keep their method order and put POST operations declaring 201 first. Hosts without HTTP metadata use Scalar method sorting. OpenAPI Scalar transformers are configured by this presenter.
 
 ## Native AOT
 

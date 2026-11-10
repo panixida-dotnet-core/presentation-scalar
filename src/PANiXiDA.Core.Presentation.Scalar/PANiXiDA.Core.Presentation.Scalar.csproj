@@ -18,6 +18,8 @@
         <FrameworkReference Include="Microsoft.AspNetCore.App" />
         <PackageReference Include="PANiXiDA.Core.ApiDocumentation" />
         <PackageReference Include="Scalar.AspNetCore" />
+        <PackageReference Include="Scalar.AspNetCore.Microsoft" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Nerdbank.GitVersioning">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>

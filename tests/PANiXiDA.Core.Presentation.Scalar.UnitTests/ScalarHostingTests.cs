@@ -73,6 +73,52 @@ public sealed class ScalarHostingTests
         await app.StopAsync(TestContext.Current.CancellationToken);
     }
 
+    [Theory(DisplayName = "Scalar orders HTTP creation operations through standard API Explorer metadata")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OrdersHttpOperations(bool enabled)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddOpenApi();
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Mvc.ApiExplorer.IApiDescriptionGroupCollectionProvider, ExampleDescriptions>();
+        builder.Services.AddApiDocumentSource<HttpSource>();
+        builder.Configuration["ScalarConfiguration:SortOperations"] = enabled.ToString();
+        builder.Services.AddApiDocumentation(builder.Configuration);
+        await using var app = builder.Build();
+        app.MapOpenApi();
+        app.MapGet("/orders", static () => "orders");
+        app.UseApiDocumentation();
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        using var client = CreateClient(app);
+        var page = await client.GetStringAsync("/scalar/", TestContext.Current.CancellationToken);
+        using var script = await client.GetAsync("/scalar/operation-order.js", TestContext.Current.CancellationToken);
+        script.StatusCode.ShouldBe(HttpStatusCode.OK);
+        script.Content.Headers.ContentType!.MediaType.ShouldBe(enabled ? "text/javascript" : "text/html");
+        if (enabled)
+        {
+            var code = await script.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            code.ShouldContain("/orders");
+            code.ShouldNotContain("/ignored");
+            page.ShouldContain("scalar/operation-order.js");
+            (await client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)).ShouldContain("openapi");
+        }
+
+        await app.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    public sealed class ExampleDescriptions : Microsoft.AspNetCore.Mvc.ApiExplorer.IApiDescriptionGroupCollectionProvider
+    {
+        public Microsoft.AspNetCore.Mvc.ApiExplorer.ApiDescriptionGroupCollection ApiDescriptionGroups { get; } = new(
+            [new Microsoft.AspNetCore.Mvc.ApiExplorer.ApiDescriptionGroup("v1",
+            [
+                new() { ActionDescriptor = new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor { RouteValues = { ["controller"] = "Orders" } }, HttpMethod = "POST", RelativePath = "orders/", SupportedResponseTypes = { new() { StatusCode = 201 } } },
+                new() { ActionDescriptor = new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor { RouteValues = { ["controller"] = "Orders" } }, HttpMethod = "POST", RelativePath = "orders", SupportedResponseTypes = { new() { StatusCode = 201 } } },
+                new() { ActionDescriptor = new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor { RouteValues = { ["controller"] = "Orders" } }, HttpMethod = "GET", RelativePath = "ignored" },
+                new() { ActionDescriptor = new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor { RouteValues = { ["controller"] = "Orders" } }, GroupName = "excluded", HttpMethod = "POST", RelativePath = null },
+                new() { ActionDescriptor = new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor { RouteValues = { ["controller"] = "Orders" } }, HttpMethod = "POST", RelativePath = "ignored", SupportedResponseTypes = { new() { StatusCode = 200 } } }
+            ])], 1);
+    }
     private static WebApplication CreateApplication(string environment, string? enabled = null,
         Dictionary<string, string?>? extra = null)
     {

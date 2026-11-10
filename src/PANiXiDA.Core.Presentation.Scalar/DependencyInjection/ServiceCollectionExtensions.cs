@@ -7,6 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PANiXiDA.Core.Presentation.Scalar.Options;
 
+using Microsoft.AspNetCore.OpenApi;
+using Scalar.AspNetCore;
+
 namespace PANiXiDA.Core.Presentation.Scalar.DependencyInjection;
 
 /// <summary>Registers the single documentation presenter used by the web host.</summary>
@@ -24,6 +27,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         services.AddApiDocumentationSchemas(contexts);
         services.TryAddSingleton<ApiDocumentCatalog>();
+        services.ConfigureAll<OpenApiOptions>(options => options.AddScalarTransformers());
         services.AddOptions<ApiDocumentationOptions>()
             .Bind(configuration.GetSection(ApiDocumentationOptions.SectionName));
         return services;
