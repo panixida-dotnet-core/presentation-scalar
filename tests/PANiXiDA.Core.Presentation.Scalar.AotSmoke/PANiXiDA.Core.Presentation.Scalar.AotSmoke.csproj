@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <PropertyGroup>
+        <PublishAot>true</PublishAot>
+        <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
+        <IlcPackageVersion>10.0.14</IlcPackageVersion>
+        <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/PANiXiDA.Core.Presentation.Scalar/PANiXiDA.Core.Presentation.Scalar.csproj" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <IsPackable>true</IsPackable>
+        <IsAotCompatible>true</IsAotCompatible>
+        <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+
+        <AssemblyName>PANiXiDA.Core.Presentation.Scalar</AssemblyName>
+
+        <PackageId>PANiXiDA.Core.Presentation.Scalar</PackageId>
+        <Description>Shared Scalar UI hosting for modular OpenAPI and AsyncAPI documents.</Description>
+        <PackageTags>PANiXiDA;Core;Scalar;OpenAPI;AsyncAPI;NativeAOT</PackageTags>
+
+        <RepositoryUrl>https://github.com/panixida-dotnet-core/presentation-scalar</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/panixida-dotnet-core/presentation-scalar</PackageProjectUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <PackageReference Include="PANiXiDA.Core.ApiDocumentation" />
+        <PackageReference Include="Scalar.AspNetCore" />
+        <PackageReference Include="Nerdbank.GitVersioning">
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+    </ItemGroup>
+</Project>
