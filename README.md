@@ -45,7 +45,7 @@ Without `Enabled`, documentation is exposed only in Development. Put the favicon
 
 ## Native AOT
 
-The presenter uses generated configuration binding and explicit request delegates. JSON schemas require source-generated contexts and have no reflection fallback. CI publishes and runs a Linux Native AOT host, serving both Scalar and an AsyncAPI document over Kestrel.
+The presenter uses generated configuration binding and explicit request delegates. JSON schemas require source-generated contexts and have no reflection fallback. A local Native AOT smoke host serves both Scalar and an AsyncAPI document over Kestrel.
 
 ## Development
 
