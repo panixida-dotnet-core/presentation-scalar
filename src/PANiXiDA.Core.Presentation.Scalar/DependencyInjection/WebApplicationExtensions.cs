@@ -69,13 +69,14 @@ public static class WebApplicationExtensions
                     throw new InvalidOperationException($"AsyncAPI source returned non-AsyncAPI document '{document.Name}'.");
                 }
 
-                RequestDelegate handler = async context =>
+                async Task Handler(HttpContext context)
                 {
                     context.Response.ContentType = "application/json";
                     await context.Response.WriteAsync(
                         source.Generate(document.Name, context.RequestAborted).ToJsonString(), context.RequestAborted);
-                };
-                app.MapGet(document.Path, handler).ExcludeFromDescription();
+                }
+
+                app.MapGet(document.Path, (RequestDelegate)Handler).ExcludeFromDescription();
             }
         }
 
@@ -96,18 +97,7 @@ public static class WebApplicationExtensions
                 options.WithFavicon(settings.Favicon);
             }
 
-            if (settings.SortOperations && options.OperationSorter is null &&
-                string.IsNullOrWhiteSpace(options.JavaScriptConfiguration))
-            {
-                if (descriptions is null)
-                {
-                    options.SortOperationsByMethod();
-                }
-                else
-                {
-                    options.WithJavaScriptConfiguration(ScalarOperationOrdering.ConfigurationPath.TrimStart('/'));
-                }
-            }
+            ConfigureOperationSorting(options, settings, descriptions);
 
             foreach (var document in catalog.GetDocuments())
             {
@@ -123,6 +113,25 @@ public static class WebApplicationExtensions
         });
     }
 
+    private static void ConfigureOperationSorting(ScalarOptions options, ApiDocumentationOptions settings,
+        IApiDescriptionGroupCollectionProvider? descriptions)
+    {
+        if (!settings.SortOperations || options.OperationSorter is not null ||
+            !string.IsNullOrWhiteSpace(options.JavaScriptConfiguration))
+        {
+            return;
+        }
+
+        if (descriptions is null)
+        {
+            options.SortOperationsByMethod();
+        }
+        else
+        {
+            options.WithJavaScriptConfiguration(ScalarOperationOrdering.ConfigurationPath.TrimStart('/'));
+        }
+    }
+
     private static void MapOperationOrdering(WebApplication app, ApiDocumentationOptions settings,
         IApiDescriptionGroupCollectionProvider? descriptions)
     {
@@ -131,11 +140,12 @@ public static class WebApplicationExtensions
             return;
         }
 
-        RequestDelegate handler = context =>
+        Task Handler(HttpContext context)
         {
             context.Response.ContentType = MediaTypeNames.Text.JavaScript;
             return context.Response.WriteAsync(ScalarOperationOrdering.CreateConfiguration(descriptions), context.RequestAborted);
-        };
-        app.MapGet(ScalarOperationOrdering.ConfigurationPath, handler).ExcludeFromDescription();
+        }
+
+        app.MapGet(ScalarOperationOrdering.ConfigurationPath, (RequestDelegate)Handler).ExcludeFromDescription();
     }
 }

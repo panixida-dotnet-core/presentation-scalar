@@ -201,6 +201,7 @@ public sealed class ScalarHostingTests
     {
         public IReadOnlyCollection<ApiDocumentDescriptor> GetDocuments() =>
             [new("wrong-v1", "Wrong", "module", "1.0", ApiDocumentFormat.OpenApi)];
-        public JsonObject Generate(string documentName, CancellationToken cancellationToken = default) => new();
+
+        public JsonObject Generate(string documentName, CancellationToken cancellationToken = default) => [];
     }
 }
