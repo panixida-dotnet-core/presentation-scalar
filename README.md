@@ -118,6 +118,8 @@ The UI reads titles, names, paths, modules, and versions from the shared catalog
 
 OpenAPI documents show HTTP operations; AsyncAPI documents show channels, send/receive operations, messages, and replies. Display names and summaries come from document contents. This integration does not add a SignalR or Kafka execution console.
 
+Document titles label the selector and introduction. Document names are technical source identifiers used in document paths; they are not separate UI labels.
+
 HTTP owns module/version discovery through `HttpModules`. SignalR owns hub metadata through `IDocumentedHubEndpoint`; Wolverine groups Kafka registrations with `WithDocumentation`. The presenter collects their results and does not change routes, topics, or version negotiation.
 
 ## Configuration
