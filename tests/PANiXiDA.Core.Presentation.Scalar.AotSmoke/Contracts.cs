@@ -9,6 +9,7 @@ internal sealed class SmokeDocumentSource(ApiSchemaRegistry schemas) : IAsyncApi
 {
     private static readonly ApiDocumentDescriptor Descriptor = new("events-v1", "Events", "events", "1.0", ApiDocumentFormat.AsyncApi);
     public IReadOnlyCollection<ApiDocumentDescriptor> GetDocuments() => [Descriptor];
+
     public JsonObject Generate(string documentName, CancellationToken cancellationToken = default) =>
         AsyncApiDocumentBuilder.Build(Descriptor,
             [new AsyncApiOperation("StateChanged", "events", AsyncApiAction.Send,
