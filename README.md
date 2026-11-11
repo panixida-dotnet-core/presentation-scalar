@@ -1,295 +1,305 @@
-## What to do after creating a repository from this template
+# PANiXiDA.Core.Presentation.Scalar
 
-### 1. Rename repository metadata
-- change repository name
-- change solution / project names
-- change package ID
-- change assembly name
-- change repository URLs
-- change ProjectReference in test project
-- update the template smoke test namespace and expected assembly name
-
-### 2. Update package metadata
-- description
-- tags
-
-### 3. Update documentation
-- replace this template README with the project README
-- fill all placeholder sections
-- update badges
-- update installation instructions
-- add real usage examples
-
-### 4. Configure GitHub repository
-- check repository visibility
-- configure default branch
-- configure branch protection rules
-- configure Issues / Discussions if needed
-- configure repository description, topics and website
-- register the repository in the shared SonarQube inventory
-
-### 5. Prepare the first release
-- update versioning configuration pathFilters in version.json
-- verify NuGet metadata
-- verify README and icon inside the package
-- publish the first package version
-- the version is updated automatically based on the commit history
-
----
-
-# Universal README template for the NuGet package
-
-# <PackageName>
-
-`<PackageName>` is a .NET library for <short purpose>.
-
-It is designed for <target audience> who need <main value / main scenario>.
+Shared Scalar UI hosting for modular OpenAPI and AsyncAPI documents on .NET 10.
 
 ## Status
 
-[![CI](https://github.com/<OWNER>/<REPOSITORY>/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPOSITORY>/actions/workflows/ci.yml)
-[![NuGet](https://img.shields.io/nuget/v/<PACKAGE_ID>.svg)](https://www.nuget.org/packages/<PACKAGE_ID>)
-[![NuGet downloads](https://img.shields.io/nuget/dt/<PACKAGE_ID>.svg)](https://www.nuget.org/packages/<PACKAGE_ID>)
+[![CI](https://github.com/panixida-dotnet-core/presentation-scalar/actions/workflows/ci.yml/badge.svg)](https://github.com/panixida-dotnet-core/presentation-scalar/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/PANiXiDA.Core.Presentation.Scalar.svg)](https://www.nuget.org/packages/PANiXiDA.Core.Presentation.Scalar)
+[![NuGet downloads](https://img.shields.io/nuget/dt/PANiXiDA.Core.Presentation.Scalar.svg)](https://www.nuget.org/packages/PANiXiDA.Core.Presentation.Scalar)
 [![Target Framework](https://img.shields.io/badge/target-net10.0-512BD4)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/github/license/<OWNER>/<REPOSITORY>.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/panixida-dotnet-core/presentation-scalar.svg)](LICENSE)
 
 ## Overview
 
-Describe:
+This package hosts one Scalar reference for documents supplied by PANiXiDA transport adapters. HTTP provides OpenAPI documents, while SignalR and Wolverine provide AsyncAPI documents through the common `ApiDocumentation` catalog.
 
-- what problem this package solves;
-- why it exists;
-- where it fits in the system or ecosystem;
-- how it differs from alternatives, if that matters.
-
-Keep this section short and practical.
+The presenter owns the UI and AsyncAPI document endpoints. It has no dependency on the PANiXiDA HTTP, SignalR, or Wolverine packages, so a web host can present only the transports it uses. Infrastructure registers document sources; the web host decides whether to expose Scalar.
 
 ## Features
 
-- Feature 1
-- Feature 2
-- Feature 3
-- Feature 4
-- Feature 5
+- One document selector for modules, transports, and contract versions.
+- OpenAPI and AsyncAPI rendering through Scalar.
+- AsyncAPI JSON endpoints at each source's configured path.
+- Development-only availability by default, with an explicit environment override.
+- Page title, application-owned favicon, and HTTP operation sorting.
+- Shared source-generated JSON schema contexts for transport adapters.
+- Scalar OpenAPI transformers without a dependency from the HTTP package to the UI.
 
 ## Quick Start
 
 ### Requirements
 
-- .NET 10 SDK
+- .NET 10 SDK compatible with `global.json`.
+- An ASP.NET Core `WebApplication` host targeting `net10.0`.
+- At least one registered document source from a transport adapter or a custom implementation.
 
 ### Installation
 
-```xml
-<ItemGroup>
-  <PackageReference Include="<PACKAGE_ID>" Version="..." />
-</ItemGroup>
-````
+```shell
+dotnet add package PANiXiDA.Core.Presentation.Scalar
+```
+
+The HTTP example below also uses `PANiXiDA.Core.Presentation.Http` 6.x, where Scalar hosting is provided separately:
+
+```shell
+dotnet add package PANiXiDA.Core.Presentation.Http --version "6.*"
+```
 
 ### Minimal import
 
 ```csharp
-using <RootNamespace>;
+using PANiXiDA.Core.Presentation.Scalar.DependencyInjection;
 ```
 
 ### First example
 
 ```csharp
-// Add a minimal example here
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+
+using PANiXiDA.Core.Presentation.Http.DependencyInjection;
+using PANiXiDA.Core.Presentation.Scalar.DependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHttp(builder.Configuration);
+builder.Services.AddApiDocumentation(builder.Configuration);
+
+var app = builder.Build();
+app.UseHttp();
+app.MapGet("/hello", () => TypedResults.Ok("Hello"))
+    .WithName("SayHello")
+    .WithSummary("Returns a greeting.");
+app.UseApiDocumentation();
+app.Run();
 ```
+
+Run the host in Development and open `/scalar`. HTTP maps its OpenAPI endpoints; the presenter adds the UI. HTTP-only applications do not need to pass a payload JSON context to `AddApiDocumentation`.
 
 ## Usage
 
-### Basic usage
+### Host registration and mapping order
+
+Call `AddApiDocumentation` once in the web host, supplying generated JSON contexts when AsyncAPI adapters export application payloads. Register transport services before building the application; map their endpoints before `UseApiDocumentation`.
+
+For a host already registering HTTP, SignalR, and messaging services:
 
 ```csharp
-// Add a basic example here
+builder.Services.AddApiDocumentation(
+    builder.Configuration,
+    ApplicationJsonContext.Default);
+
+var app = builder.Build();
+app.UseSignalR(MatchmakingPresentationAssembly.Instance);
+app.UseHttp();
+app.UseApiDocumentation();
+app.Run();
 ```
 
-### Typical scenario
+This fragment assumes the corresponding transport namespaces and application-owned assembly marker/context. `UseSignalR` precedes `UseHttp` so query-token forwarding runs before authentication.
 
-```csharp
-// Add a realistic example here
-```
+A SignalR-only host can use the same presenter without referencing `Presentation.Http`. Configure that host's authentication/authorization middleware and SignalR serialization separately.
 
-### Advanced scenario
+### Document sources
 
-```csharp
-// Add an advanced example here if needed
-```
+Transport adapters register `IApiDocumentSource` implementations from `PANiXiDA.Core.ApiDocumentation`. A custom source can register through `AddApiDocumentSource<TSource>()`. Sources return module/version descriptors; `IAsyncApiDocumentSource` also implements JSON generation.
+
+`UseApiDocumentation` requires at least one source when enabled. It rejects conflicting catalog names/paths and AsyncAPI sources returning a descriptor of another format. Repeated calls on the same application do not map the UI twice.
+
+### Modules, versions, and display
+
+The UI reads titles, names, paths, modules, and versions from the shared catalog. For example:
+
+| Document | Source path |
+| --- | --- |
+| Matchmaking API v1 | `/openapi/matchmaking-v1.json` |
+| Matchmaking SignalR v1.0 | `/asyncapi/matchmaking-signalr-v1.json` |
+| Matchmaking Kafka v1.0 | `/asyncapi/matchmaking-kafka-v1.json` |
+
+OpenAPI documents show HTTP operations; AsyncAPI documents show channels, send/receive operations, messages, and replies. Display names and summaries come from document contents. This integration does not add a SignalR or Kafka execution console.
+
+Document titles label the selector and introduction. Document names are technical source identifiers used in document paths; they are not separate UI labels.
+
+HTTP owns module/version discovery through `HttpModules`. SignalR owns hub metadata through `IDocumentedHubEndpoint`; Wolverine groups Kafka registrations with `WithDocumentation`. The presenter collects their results and does not change routes, topics, or version negotiation.
 
 ## Configuration
 
-Describe configuration only if the package actually requires it.
+Settings bind from the existing `ScalarConfiguration` section:
 
-Possible topics:
+```json
+{
+  "ScalarConfiguration": {
+    "Enabled": true,
+    "Title": "Tactical Heroes API",
+    "Favicon": "/favicon.svg",
+    "SortOperations": true
+  }
+}
+```
 
-* environment variables;
-* `appsettings.json`;
-* feature flags;
-* external services;
-* secrets;
-* runtime prerequisites.
+### Availability and page settings
 
-If the package does not require runtime configuration, say so explicitly.
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| `Enabled` | `null` | Enable only in Development; explicit true/false overrides the environment |
+| `Title` | Scalar default | Set the reference page title when nonblank |
+| `Favicon` | Scalar default | Use a relative or absolute favicon URI |
+| `SortOperations` | `true` | Apply default HTTP ordering unless an explicit sorter/JavaScript configuration is supplied |
+
+The web host owns access control for documentation. Enabling the UI outside Development exposes the configured documents through the application's normal endpoint pipeline.
+
+### Favicon and static assets
+
+The host validates nonblank favicon URIs at startup. Blank values use Scalar's default icon.
+
+Place local favicons in the web host's `wwwroot` and publish its static web assets. A nonblank favicon makes the presenter call `MapStaticAssets().ShortCircuit()` for host assets; those assets must be public. A slim Development host should enable its static web assets explicitly.
+
+### Operation ordering
+
+When standard API Explorer metadata is available, HTTP operations are ordered by GET, POST, PUT, PATCH, DELETE; POST operations declaring 201 are placed first among POST operations. Hosts without API Explorer metadata use Scalar method sorting.
+
+Set `SortOperations` to false to use Scalar's defaults. Explicit Scalar operation sorters and JavaScript configuration take precedence. Scalar-specific OpenAPI transformers are registered by this presenter.
+
+### JSON contracts and Native AOT
+
+Pass source-generated `JsonSerializerContext` instances covering AsyncAPI payloads. They supply documentation schemas; each transport still owns its serializer settings. Missing schema metadata fails without reflection fallback.
+
+The presenter enables AOT analysis and generated configuration binding and maps document handlers through explicit request delegates. Complete host compatibility depends on its adapters and dependencies; referencing the presenter does not remove HTTP or SignalR platform limitations.
 
 ## Project Structure
 
 ```text
 .
-├── src/
-│   └── <ProjectName>/
-├── tests/
-│   └── <ProjectName>.UnitTests/
-├── .editorconfig
-├── .gitattributes
-├── .gitignore
+├── src/PANiXiDA.Core.Presentation.Scalar/
+│   ├── Configurations/
+│   ├── DependencyInjection/
+│   ├── Options/
+│   │   └── ApiDocumentation/
+│   └── PANiXiDA.Core.Presentation.Scalar.csproj
+├── tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/
+│   ├── Configurations/
+│   ├── DependencyInjection/
+│   ├── Options/ApiDocumentation/
+│   └── TestDoubles/
+├── .github/workflows/ci.yml
 ├── Directory.Build.props
 ├── Directory.Build.targets
 ├── Directory.Packages.props
 ├── global.json
 ├── version.json
+├── icon.png
 ├── LICENSE
 └── README.md
 ```
 
 ### Main repository files
 
-* `src/` — source code
-* `tests/` — automated tests
-* `Directory.Build.props` — shared MSBuild settings
-* `Directory.Build.targets` — shared build / packaging settings
-* `Directory.Packages.props` — centralized package versions
-* `global.json` — SDK and tooling configuration
-* `version.json` — versioning configuration
-* `README.md` — package overview and usage documentation
+`src/` contains presenter registration, endpoint mapping, options, and Scalar configuration helpers. `tests/` contains Kestrel hosting tests. Shared build/package settings live in `Directory.Build.props` and `Directory.Build.targets`; package versions, SDK selection, and versioning use `Directory.Packages.props`, `global.json`, and `version.json`.
 
 ## Development
 
 ### Build
 
-```bash
+```shell
 dotnet restore
 dotnet build --configuration Release
 ```
 
 ### Format
 
-```bash
+```shell
 dotnet format
 ```
 
 ### Test
 
-```bash
+```shell
 dotnet test --configuration Release
+```
+
+### Coverage
+
+```shell
+dotnet test --configuration Release -- --coverage --coverage-output coverage.xml --coverage-output-format xml
 ```
 
 ### Pack
 
-```bash
+```shell
 dotnet pack --configuration Release
+```
+
+### Full local validation
+
+```shell
+dotnet restore
+dotnet format
+dotnet build --configuration Release
+dotnet test --configuration Release
 ```
 
 ### Continuous integration
 
-Every pull request and push to `main` runs formatting, tests, and mandatory
-SonarQube analysis. Publishing from `main` starts only after the SonarQube
-Quality Gate succeeds.
-
-### Full local validation
-
-```bash
-dotnet restore
-dotnet format
-dotnet build --configuration Release
-dotnet test --configuration Release
-dotnet pack --configuration Release
-```
+Every pull request and push to `main` runs formatting, tests, and mandatory SonarQube analysis. Publishing from `main` requires successful formatting, tests, and the SonarQube Quality Gate.
 
 ### Tooling and conventions
 
-This repository uses:
-
-* .NET 10
-* Nullable enabled
-* Implicit usings enabled
-* Central package management
-* GitHub Actions
-* SonarQube
-* Nerdbank.GitVersioning
-
-Add more items only if they are actually relevant for the repository.
+- .NET 10, nullable reference types, and implicit usings.
+- Central package management through `Directory.Packages.props`.
+- Microsoft Testing Platform, xUnit v3, and Shouldly.
+- Nerdbank.GitVersioning through `version.json`.
+- Package metadata, README, and icon inclusion through `Directory.Build.targets`.
 
 ## API / Contracts / Examples
 
-Describe the public API surface here.
+### Public API
 
-Suggested structure:
+| API | Responsibility |
+| --- | --- |
+| `services.AddApiDocumentation(configuration, contexts)` | Register settings, catalog, generated schemas, and Scalar OpenAPI transformers |
+| `app.UseApiDocumentation()` | Map AsyncAPI documents, optional static assets/ordering, and one Scalar reference |
+| `ApiDocumentationOptions` in `Options.ApiDocumentation` | Configure availability, page title, favicon, and operation sorting |
 
-* core abstractions;
-* main entry points;
-* key extension methods;
-* important behavioral notes;
-* typical integration examples.
+### Behavioral notes
+
+- Call `UseApiDocumentation` after transport mapping; document sources must be registered in DI.
+- The presenter maps AsyncAPI JSON; OpenAPI document routes remain transport-owned.
+- Document names and paths must be unique across all registered sources.
+- `ScalarConfiguration:Enabled` controls presenter availability; the matching HTTP adapter honors the same setting for OpenAPI routes.
+- Workers can use `ApiDocumentation` to export documents without hosting this UI package.
+
+### Package contents
+
+The package includes the `net10.0` library, XML documentation, README, package icon, and Source Link metadata. Repository packaging also produces a symbols package. Transport adapters are separate dependencies chosen by the consuming application.
 
 ## Roadmap / TODO
 
-Potential future improvements:
-
-* item 1;
-* item 2;
-* item 3.
-
-Remove this section if it does not provide value.
+Track proposed changes and known issues in [GitHub Issues](https://github.com/panixida-dotnet-core/presentation-scalar/issues). New capabilities should follow concrete transport and consumer requirements.
 
 ## Contributing
 
-Contributions are welcome.
-
 ### General rules
 
-* keep the public API intentional;
-* avoid unnecessary dependencies;
-* preserve repository conventions;
-* do not introduce breaking changes without review;
-* keep documentation updated.
+Keep the public API focused, preserve existing contracts, and justify new dependencies. Public APIs require English XML documentation. Update this README when usage, configuration, or package behavior changes.
 
 ### Code style
 
-* follow the repository `.editorconfig`;
-* prefer readable and explicit code;
-* keep naming consistent with the existing codebase.
+Follow `.editorconfig` and existing naming. Prefer readable implementations and separate documented members with blank lines.
 
 ### Tests
 
-* add or update tests for meaningful behavior changes;
-* cover both success and failure scenarios where applicable;
-* add regression tests for bug fixes.
+Cover meaningful behavior changes, guard clauses, and failures. Use Arrange, Act, Assert and English `DisplayName` values. Test projects provide global `Xunit` and `Shouldly` imports.
 
 ### Validation before completion
 
-Run:
-
-```bash
-dotnet restore
-dotnet format
-dotnet build --configuration Release
-dotnet test --configuration Release
-```
+Run the commands in [Full local validation](#full-local-validation). Keep generated build output and temporary diagnostics out of commits.
 
 ## License
 
-This project is licensed under the <LicenseName> license.
-
-See the [LICENSE](LICENSE) file for details.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
 ## Maintainers / Contacts
 
-Maintained by <Author / Team / Organization>.
+Maintained by [PANiXiDA](https://github.com/PANiXiDA).
 
-For questions or improvements, use:
-
-* GitHub Issues
-* Pull Requests
-* GitHub Discussions, if enabled
+Use [Issues](https://github.com/panixida-dotnet-core/presentation-scalar/issues) for questions and defects, and [Pull Requests](https://github.com/panixida-dotnet-core/presentation-scalar/pulls) for proposed changes.
