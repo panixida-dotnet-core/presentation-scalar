@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace PANiXiDA.Core.Presentation.Scalar.Options;
+namespace PANiXiDA.Core.Presentation.Scalar.Options.ApiDocumentation;
 
 internal sealed class ApiDocumentationOptionsValidator : IValidateOptions<ApiDocumentationOptions>
 {

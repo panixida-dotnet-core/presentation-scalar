@@ -1,4 +1,6 @@
+#pragma warning disable IDE0130 // Keep the public options namespace when grouping files by feature.
 namespace PANiXiDA.Core.Presentation.Scalar.Options;
+#pragma warning restore IDE0130
 
 /// <summary>Configures the shared API documentation presenter.</summary>
 public sealed class ApiDocumentationOptions

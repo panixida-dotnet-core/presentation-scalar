@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using PANiXiDA.Core.Presentation.Scalar.Options;
+using PANiXiDA.Core.Presentation.Scalar.Options.ApiDocumentation;
 
 using Microsoft.AspNetCore.OpenApi;
 using Scalar.AspNetCore;
