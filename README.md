@@ -254,7 +254,7 @@ Every pull request and push to `main` runs formatting, tests, and mandatory Sona
 | --- | --- |
 | `services.AddApiDocumentation(configuration, contexts)` | Register settings, catalog, generated schemas, and Scalar OpenAPI transformers |
 | `app.UseApiDocumentation()` | Map AsyncAPI documents, optional static assets/ordering, and one Scalar reference |
-| `ApiDocumentationOptions` | Configure availability, page title, favicon, and operation sorting |
+| `ApiDocumentationOptions` in `Options.ApiDocumentation` | Configure availability, page title, favicon, and operation sorting |
 
 ### Behavioral notes
 

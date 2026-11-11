@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using PANiXiDA.Core.Presentation.Scalar.Options;
+using PANiXiDA.Core.Presentation.Scalar.Options.ApiDocumentation;
 
 using Scalar.AspNetCore;
 
