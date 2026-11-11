@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using PANiXiDA.Core.Presentation.Scalar.Options;
 
 using Microsoft.AspNetCore.OpenApi;
@@ -28,8 +29,11 @@ public static class ServiceCollectionExtensions
         services.AddApiDocumentationSchemas(contexts);
         services.TryAddSingleton<ApiDocumentCatalog>();
         services.ConfigureAll<OpenApiOptions>(options => options.AddScalarTransformers());
+        services.AddSingleton<IValidateOptions<ApiDocumentationOptions>, ApiDocumentationOptionsValidator>();
         services.AddOptions<ApiDocumentationOptions>()
-            .Bind(configuration.GetSection(ApiDocumentationOptions.SectionName));
+            .Bind(configuration.GetSection(ApiDocumentationOptions.SectionName))
+            .ValidateOnStart();
+
         return services;
     }
 }

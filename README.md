@@ -143,12 +143,14 @@ Settings bind from the existing `ScalarConfiguration` section:
 | --- | --- | --- |
 | `Enabled` | `null` | Enable only in Development; explicit true/false overrides the environment |
 | `Title` | Scalar default | Set the reference page title when nonblank |
-| `Favicon` | Scalar default | Use the supplied application-owned favicon URL |
+| `Favicon` | Scalar default | Use a relative or absolute favicon URI |
 | `SortOperations` | `true` | Apply default HTTP ordering unless an explicit sorter/JavaScript configuration is supplied |
 
 The web host owns access control for documentation. Enabling the UI outside Development exposes the configured documents through the application's normal endpoint pipeline.
 
 ### Favicon and static assets
+
+The host validates nonblank favicon URIs at startup. Blank values use Scalar's default icon.
 
 Place local favicons in the web host's `wwwroot` and publish its static web assets. A nonblank favicon makes the presenter call `MapStaticAssets().ShortCircuit()` for host assets; those assets must be public. A slim Development host should enable its static web assets explicitly.
 
@@ -172,6 +174,7 @@ The presenter enables AOT analysis and generated configuration binding and maps 
 │   ├── Configurations/
 │   ├── DependencyInjection/
 │   ├── Options/
+│   │   └── ApiDocumentation/
 │   └── PANiXiDA.Core.Presentation.Scalar.csproj
 ├── tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/
 ├── .github/workflows/ci.yml

@@ -12,7 +12,7 @@ public sealed class ApiDocumentationOptions
     /// <summary>Gets or sets the reference page title.</summary>
     public string? Title { get; set; }
 
-    /// <summary>Gets or sets the favicon URL owned by the web application.</summary>
+    /// <summary>Gets or sets the relative or absolute favicon URI.</summary>
     public string? Favicon { get; set; }
 
     /// <summary>Gets or sets whether default operation sorting is enabled.</summary>

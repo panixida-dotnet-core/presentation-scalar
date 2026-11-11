@@ -4,6 +4,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.Options;
 
 using PANiXiDA.Core.ApiDocumentation;
 using PANiXiDA.Core.ApiDocumentation.DependencyInjection;
@@ -61,7 +62,7 @@ public sealed class ScalarHostingTests
     [Fact(DisplayName = "Presenter applies shared title and supports disabling operation sorting")]
     public async Task AppliesOptions()
     {
-        await using var app = CreateApplication("Development", extra: new Dictionary<string, string?>
+        await using var app = CreateApplication("Development", extra: new()
         {
             ["ScalarConfiguration:Title"] = "Shared API documentation",
             ["ScalarConfiguration:SortOperations"] = "false"
@@ -147,12 +148,28 @@ public sealed class ScalarHostingTests
         Should.Throw<InvalidOperationException>(() => app.UseApiDocumentation()).Message.ShouldContain("non-AsyncAPI");
     }
 
-    [Fact(DisplayName = "Presenter applies the host favicon and preserves explicitly configured Scalar sorting")]
-    public async Task AppliesFaviconAndCustomSorting()
+    [Fact(DisplayName = "An invalid favicon URI is rejected during host startup")]
+    public async Task RejectsInvalidFavicon()
+    {
+        await using var app = CreateApplication("Development", extra: new Dictionary<string, string?>
+        {
+            ["ScalarConfiguration:Favicon"] = "https://"
+        });
+
+        var error = await Should.ThrowAsync<OptionsValidationException>(() =>
+            app.StartAsync(TestContext.Current.CancellationToken));
+
+        error.Failures.ShouldContain("ScalarConfiguration:Favicon must be a well-formed relative or absolute URI.");
+    }
+
+    [Theory(DisplayName = "Presenter applies the host favicon and preserves explicitly configured Scalar sorting")]
+    [InlineData("/favicon.svg")]
+    [InlineData("https://cdn.example.com/favicon.svg")]
+    public async Task AppliesFaviconAndCustomSorting(string favicon)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Configuration["ScalarConfiguration:Favicon"] = "/favicon.svg";
+        builder.Configuration["ScalarConfiguration:Favicon"] = favicon;
         builder.Services.AddApiDocumentSource<ExampleSource>();
         builder.Services.AddApiDocumentation(builder.Configuration);
         builder.Services.Configure<global::Scalar.AspNetCore.ScalarOptions>(options =>
@@ -162,7 +179,7 @@ public sealed class ScalarHostingTests
         await app.StartAsync(TestContext.Current.CancellationToken);
         using var client = CreateClient(app);
         var page = await client.GetStringAsync("/scalar/", TestContext.Current.CancellationToken);
-        page.ShouldContain("/favicon.svg");
+        page.ShouldContain(favicon);
         (await client.GetStringAsync("/favicon.svg", TestContext.Current.CancellationToken)).ShouldContain("<svg");
         page.ShouldContain("custom-sort.js");
         await app.StopAsync(TestContext.Current.CancellationToken);
