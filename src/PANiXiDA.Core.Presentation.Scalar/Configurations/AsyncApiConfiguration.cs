@@ -1,3 +1,5 @@
+using System.Net.Mime;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
@@ -20,7 +22,7 @@ internal static class AsyncApiConfiguration
 
                 async Task Handler(HttpContext context)
                 {
-                    context.Response.ContentType = "application/json";
+                    context.Response.ContentType = MediaTypeNames.Application.Json;
                     await context.Response.WriteAsync(
                         source.Generate(document.Name, context.RequestAborted).ToJsonString(), context.RequestAborted);
                 }

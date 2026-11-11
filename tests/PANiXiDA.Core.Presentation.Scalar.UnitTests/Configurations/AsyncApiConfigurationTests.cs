@@ -1,3 +1,4 @@
+using System.Net.Mime;
 using System.Text.Json.Nodes;
 
 using PANiXiDA.Core.ApiDocumentation;
@@ -24,7 +25,7 @@ public sealed class AsyncApiConfigurationTests
         response.EnsureSuccessStatusCode();
         var document = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
 
-        response.Content.Headers.ContentType!.MediaType.ShouldBe("application/json");
+        response.Content.Headers.ContentType!.MediaType.ShouldBe(MediaTypeNames.Application.Json);
         document["asyncapi"]!.GetValue<string>().ShouldBe("3.0.0");
     }
 

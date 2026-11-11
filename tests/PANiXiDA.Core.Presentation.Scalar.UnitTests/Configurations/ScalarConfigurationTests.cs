@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Mime;
 
 using PANiXiDA.Core.ApiDocumentation.DependencyInjection;
 using PANiXiDA.Core.Presentation.Scalar.DependencyInjection;
@@ -16,7 +17,7 @@ public sealed class ScalarConfigurationTests
         builder.Services.AddApiDocumentSource<OpenApiTestSource>();
         builder.Services.AddApiDocumentation(builder.Configuration);
         await using var app = builder.Build();
-        app.MapGet("/openapi/http-v1.json", () => Results.Text("{\"openapi\":\"3.1.0\"}", "application/json"));
+        app.MapGet("/openapi/http-v1.json", () => Results.Text("{\"openapi\":\"3.1.0\"}", MediaTypeNames.Application.Json));
         app.UseApiDocumentation();
         await app.StartAsync(TestContext.Current.CancellationToken);
         using var client = ScalarTestHost.CreateClient(app);
