@@ -177,6 +177,10 @@ The presenter enables AOT analysis and generated configuration binding and maps 
 │   │   └── ApiDocumentation/
 │   └── PANiXiDA.Core.Presentation.Scalar.csproj
 ├── tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/
+│   ├── Configurations/
+│   ├── DependencyInjection/
+│   ├── Options/ApiDocumentation/
+│   └── TestDoubles/
 ├── .github/workflows/ci.yml
 ├── Directory.Build.props
 ├── Directory.Build.targets

@@ -1,16 +1,56 @@
 
+using System.Net.Mime;
 using System.Text.Json;
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
+
+using Scalar.AspNetCore;
 
 namespace PANiXiDA.Core.Presentation.Scalar.Configurations;
 
 internal static class ScalarOperationOrdering
 {
-    internal const string ConfigurationPath = "/scalar/operation-order.js";
+    private const string ConfigurationPath = "/scalar/operation-order.js";
 
-    internal static string CreateConfiguration(IApiDescriptionGroupCollectionProvider descriptions)
+    internal static void MapOperationOrdering(this WebApplication app, bool enabled,
+        IApiDescriptionGroupCollectionProvider? descriptions)
+    {
+        if (!enabled || descriptions is null)
+        {
+            return;
+        }
+
+        Task Handler(HttpContext context)
+        {
+            context.Response.ContentType = MediaTypeNames.Text.JavaScript;
+            return context.Response.WriteAsync(CreateConfiguration(descriptions), context.RequestAborted);
+        }
+
+        app.MapGet(ConfigurationPath, (RequestDelegate)Handler).ExcludeFromDescription();
+    }
+
+    internal static void ConfigureOperationSorting(this ScalarOptions options, bool enabled,
+        IApiDescriptionGroupCollectionProvider? descriptions)
+    {
+        if (!enabled || options.OperationSorter is not null ||
+            !string.IsNullOrWhiteSpace(options.JavaScriptConfiguration))
+        {
+            return;
+        }
+
+        if (descriptions is null)
+        {
+            options.SortOperationsByMethod();
+        }
+        else
+        {
+            options.WithJavaScriptConfiguration(ConfigurationPath.TrimStart('/'));
+        }
+    }
+
+    private static string CreateConfiguration(IApiDescriptionGroupCollectionProvider descriptions)
     {
         var creationPaths = descriptions.ApiDescriptionGroups.Items
             .SelectMany(group => group.Items)
