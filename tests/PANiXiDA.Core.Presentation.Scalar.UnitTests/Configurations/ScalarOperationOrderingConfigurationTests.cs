@@ -11,7 +11,7 @@ using Scalar.AspNetCore;
 
 namespace PANiXiDA.Core.Presentation.Scalar.UnitTests.Configurations;
 
-public sealed class ScalarOperationOrderingTests
+public sealed class ScalarOperationOrderingConfigurationTests
 {
     [Theory(DisplayName = "Scalar orders HTTP creation operations through standard API Explorer metadata")]
     [InlineData(true)]

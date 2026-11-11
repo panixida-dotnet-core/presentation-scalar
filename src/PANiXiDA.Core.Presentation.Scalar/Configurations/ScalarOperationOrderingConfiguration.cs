@@ -1,6 +1,7 @@
 
 using System.Net.Mime;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -10,7 +11,7 @@ using Scalar.AspNetCore;
 
 namespace PANiXiDA.Core.Presentation.Scalar.Configurations;
 
-internal static class ScalarOperationOrdering
+internal static partial class ScalarOperationOrderingConfiguration
 {
     private const string ConfigurationPath = "/scalar/operation-order.js";
 
@@ -63,7 +64,7 @@ internal static class ScalarOperationOrdering
             .Order(StringComparer.Ordinal)
             .ToArray();
         var configuration = $$"""
-            const creationPaths = new Set({{JsonSerializer.Serialize(creationPaths, ScalarJsonContext.Default.StringArray)}});
+            const creationPaths = new Set({{JsonSerializer.Serialize(creationPaths, JsonContext.Default.StringArray)}});
             const methods = ['get', 'post', 'put', 'patch', 'delete'];
 
             function priority(operation) {
@@ -82,4 +83,7 @@ internal static class ScalarOperationOrdering
 
         return configuration;
     }
+
+    [JsonSerializable(typeof(string[]))]
+    private sealed partial class JsonContext : JsonSerializerContext;
 }
