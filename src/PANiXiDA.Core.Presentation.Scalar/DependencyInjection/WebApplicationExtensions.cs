@@ -42,6 +42,11 @@ public static class WebApplicationExtensions
         }
 
         app.MapAsyncApi(sources);
+        if (sources.OfType<IAsyncApiDocumentSource>().Any())
+        {
+            app.MapSignalRConsole();
+        }
+
         var descriptions = app.Services.GetService<IApiDescriptionGroupCollectionProvider>();
         app.MapOperationOrdering(settings.SortOperations, descriptions);
         app.MapScalar(settings, catalog, descriptions);

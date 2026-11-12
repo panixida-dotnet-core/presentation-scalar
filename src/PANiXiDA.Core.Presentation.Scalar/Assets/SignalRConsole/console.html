@@ -1,0 +1,37 @@
+<button type="button" data-open>SignalR console</button>
+<dialog aria-labelledby="panixida-signalr-title">
+    <header>
+        <h2 id="panixida-signalr-title">SignalR console</h2>
+        <button type="button" data-hide>Hide</button>
+    </header>
+    <form data-connection>
+        <label>Hub <select name="hub" required></select></label>
+        <label>Bearer token <input name="token" type="password" autocomplete="off" spellcheck="false"></label>
+        <div class="signalr-actions">
+            <button type="submit" data-primary>Connect</button>
+            <button type="button" data-disconnect disabled>Disconnect</button>
+            <output data-status>Disconnected</output>
+        </div>
+    </form>
+    <form data-command>
+        <label>Hub method
+            <input name="method" list="panixida-signalr-methods" autocomplete="off" spellcheck="false" required>
+        </label>
+        <datalist id="panixida-signalr-methods"></datalist>
+        <label>Arguments (JSON array) <textarea name="arguments" rows="2" spellcheck="false">[]</textarea></label>
+        <label data-uploads hidden>Upload streams (JSON arrays)<span></span>
+            <textarea name="uploads" rows="2" spellcheck="false"></textarea>
+        </label>
+        <div class="signalr-actions">
+            <button type="submit" value="invoke" data-primary disabled>Invoke</button>
+            <button type="submit" value="send" disabled>Send</button>
+        </div>
+    </form>
+    <section aria-label="Messages">
+        <header>
+            <h3>Messages</h3>
+            <button type="button" data-clear>Clear</button>
+        </header>
+        <ol role="log" aria-label="SignalR messages"></ol>
+    </section>
+</dialog>
