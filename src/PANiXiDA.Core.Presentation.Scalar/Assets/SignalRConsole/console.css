@@ -1,0 +1,115 @@
+#panixida-signalr-console {
+    --console-background: var(--scalar-background-1, light-dark(#fff, #171717));
+    --console-surface: var(--scalar-background-2, light-dark(#f6f6f6, #222));
+    --console-border: var(--scalar-border-color, light-dark(#d4d4d4, #454545));
+    --console-text: var(--scalar-color-1, light-dark(#202020, #eee));
+    --console-secondary: var(--scalar-color-2, light-dark(#545454, #b4b4b4));
+    font: 14px/1.4 var(--scalar-font, system-ui, sans-serif);
+    color: var(--console-text);
+}
+
+body.dark-mode #panixida-signalr-console {
+    color-scheme: dark;
+}
+
+#panixida-signalr-console [data-open],
+#panixida-signalr-console dialog {
+    position: fixed;
+    inset: auto 1rem 1rem auto;
+    z-index: 100;
+}
+
+#panixida-signalr-console dialog {
+    box-sizing: border-box;
+    width: min(30rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    border: 1px solid var(--console-border);
+    border-radius: 12px;
+    background: var(--console-background);
+    color: var(--console-text);
+    box-shadow: 0 8px 32px #0003;
+}
+
+#panixida-signalr-console header,
+#panixida-signalr-console .signalr-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#panixida-signalr-console header {
+    justify-content: space-between;
+}
+
+#panixida-signalr-console h2,
+#panixida-signalr-console h3 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 650;
+}
+
+#panixida-signalr-console form {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0.85rem 0;
+}
+
+#panixida-signalr-console label {
+    display: grid;
+    gap: 0.25rem;
+}
+
+#panixida-signalr-console [hidden] {
+    display: none;
+}
+
+#panixida-signalr-console :is(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+    background: var(--console-surface);
+    border: 1px solid var(--console-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+}
+
+#panixida-signalr-console :is(input, select, textarea) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+}
+
+#panixida-signalr-console button:not(:disabled) {
+    cursor: pointer;
+}
+
+#panixida-signalr-console button:disabled {
+    opacity: 0.45;
+}
+
+#panixida-signalr-console :is([data-primary], [data-open]) {
+    color: var(--console-background);
+    background: var(--console-text);
+}
+
+#panixida-signalr-console output {
+    color: var(--console-secondary);
+}
+
+#panixida-signalr-console ol {
+    margin: 0.5rem 0 0;
+    padding: 0;
+    max-height: 12rem;
+    overflow: auto;
+    list-style: none;
+    font: 0.84em/1.5 var(--scalar-font-code, ui-monospace, monospace);
+}
+
+#panixida-signalr-console li {
+    padding: 0.35rem 0;
+    border-top: 1px solid var(--console-border);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}

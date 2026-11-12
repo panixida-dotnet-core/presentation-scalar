@@ -18,7 +18,7 @@ internal static class ScalarConfiguration
             app.MapStaticAssets().ShortCircuit();
         }
 
-        app.MapScalarApiReference(options =>
+        app.MapScalarApiReference((options, context) =>
         {
             if (!string.IsNullOrWhiteSpace(settings.Title))
             {
@@ -32,7 +32,8 @@ internal static class ScalarConfiguration
 
             options.ConfigureOperationSorting(settings.SortOperations, descriptions);
 
-            foreach (var document in catalog.GetDocuments())
+            var documents = catalog.GetDocuments();
+            foreach (var document in documents)
             {
                 if (document.Format == ApiDocumentFormat.OpenApi)
                 {
@@ -43,6 +44,8 @@ internal static class ScalarConfiguration
                     options.AddAsyncApiDocument(document.Name, document.Title, document.Path);
                 }
             }
+
+            options.ConfigureSignalRConsole(context.Request.PathBase, documents);
         });
     }
 }

@@ -21,6 +21,7 @@ The presenter owns the UI and AsyncAPI document endpoints. It has no dependency 
 - One document selector for modules, transports, and contract versions.
 - OpenAPI and AsyncAPI rendering through Scalar.
 - AsyncAPI JSON endpoints at each source's configured path.
+- A live SignalR console for documented WebSocket hubs.
 - Development-only availability by default, with an explicit environment override.
 - Page title, application-owned favicon, and HTTP operation sorting.
 - Shared source-generated JSON schema contexts for transport adapters.
@@ -116,11 +117,19 @@ The UI reads titles, names, paths, modules, and versions from the shared catalog
 | Matchmaking SignalR v1.0 | `/asyncapi/matchmaking-signalr-v1.json` |
 | Matchmaking Kafka v1.0 | `/asyncapi/matchmaking-kafka-v1.json` |
 
-OpenAPI documents show HTTP operations; AsyncAPI documents show channels, send/receive operations, messages, and replies. Display names and summaries come from document contents. This integration does not add a SignalR or Kafka execution console.
+OpenAPI documents show HTTP operations; AsyncAPI documents show channels, send/receive operations, messages, and replies. Display names and summaries come from document contents.
 
 Document titles label the selector and introduction. Document names are technical source identifiers used in document paths; they are not separate UI labels.
 
 HTTP owns module/version discovery through `HttpModules`. SignalR owns hub metadata through `IDocumentedHubEndpoint`; Wolverine groups Kafka registrations with `WithDocumentation`. The presenter collects their results and does not change routes, topics, or version negotiation.
+
+### SignalR console
+
+Open **SignalR console** in Scalar, select a hub, enter a bearer token if required, and click **Connect**. The console lists same-origin hubs whose AsyncAPI bindings advertise WebSockets and the SignalR JSON protocol. The page keeps the token in memory and sends it through the SignalR client's authentication flow.
+
+Incoming events appear in **Messages**. Select or enter a hub method, supply its arguments as a JSON array, and use **Invoke** to see the reply or **Send** for a one-way command. Use **Stream** for documented streaming methods and provide one JSON array of items per documented input stream. **Hide** keeps the connection open while you use Scalar's HTTP tools. **Disconnect** closes it.
+
+The package serves the official `@microsoft/signalr` 10.0.11 browser bundle locally. The bundle comes from `dist/browser/signalr.min.js` in the npm package, with its source map reference removed.
 
 ## Configuration
 
