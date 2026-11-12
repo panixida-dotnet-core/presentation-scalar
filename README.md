@@ -129,7 +129,7 @@ Open **SignalR console** in Scalar, select a hub, enter a bearer token if requir
 
 Incoming events appear in **Messages**. Use **Test Request** beside a documented hub method to open the console with its hub, method and example arguments selected. The console uses a message example when available and builds arguments from the payload schema otherwise. Use **Invoke** to see the reply, **Send** for a one-way command, or **Stream** for a streaming method. **Hide** keeps the connection open while you use Scalar's HTTP tools. **Disconnect** closes it.
 
-The package serves the official `@microsoft/signalr` 10.0.11 browser bundle locally. The bundle comes from `dist/browser/signalr.min.js` in the npm package, with its source map reference removed.
+The package serves the `@microsoft/signalr` 10.0.11 browser bundle locally. The bundle comes from `dist/browser/signalr.min.js` in the npm package. The vendored copy omits the source map reference and decrements the loop index after removing a stream in `HubConnection._replaceStreamingParams` so consecutive upload streams are all extracted.
 
 ## Configuration
 
