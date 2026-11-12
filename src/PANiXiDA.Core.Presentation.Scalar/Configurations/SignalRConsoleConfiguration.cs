@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.FileProviders;
 
 using PANiXiDA.Core.ApiDocumentation;
 
@@ -15,11 +16,13 @@ namespace PANiXiDA.Core.Presentation.Scalar.Configurations;
 internal static partial class SignalRConsoleConfiguration
 {
     private const string AssetPath = "/scalar/signalr-console";
-    private const string ResourcePrefix = "PANiXiDA.Core.Presentation.Scalar.Assets.SignalRConsole.";
+
+    private static readonly EmbeddedFileProvider s_assets = new(typeof(SignalRConsoleConfiguration).Assembly,
+        "PANiXiDA.Core.Presentation.Scalar.Assets.SignalRConsole");
 
     private static readonly Lazy<string> s_markup = new(() =>
     {
-        using var reader = new StreamReader(OpenResource("console.html"));
+        using var reader = new StreamReader(s_assets.GetFileInfo("console.html").CreateReadStream());
         return reader.ReadToEnd();
     });
 
@@ -58,7 +61,7 @@ internal static partial class SignalRConsoleConfiguration
 
     private static void MapAsset(WebApplication app, string name, string contentType)
     {
-        using var resource = OpenResource(name);
+        using var resource = s_assets.GetFileInfo(name).CreateReadStream();
         using var buffer = new MemoryStream();
         resource.CopyTo(buffer);
         var bytes = buffer.ToArray();
@@ -72,10 +75,6 @@ internal static partial class SignalRConsoleConfiguration
 
         app.MapGet($"{AssetPath}/{name}", (RequestDelegate)Handler).ExcludeFromDescription();
     }
-
-    private static Stream OpenResource(string name) =>
-        typeof(SignalRConsoleConfiguration).Assembly.GetManifestResourceStream(ResourcePrefix + name)
-        ?? throw new InvalidOperationException($"SignalR console resource '{name}' is missing.");
 
     [JsonSerializable(typeof(string[]))]
     private sealed partial class ConsoleJsonContext : JsonSerializerContext;
