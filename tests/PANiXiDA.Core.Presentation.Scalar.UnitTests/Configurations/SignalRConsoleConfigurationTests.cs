@@ -26,6 +26,7 @@ public sealed class SignalRConsoleConfigurationTests
 
         var page = await client.GetStringAsync(PathBase + "/scalar/", cancellationToken);
         using var script = await client.GetAsync(ConsolePath + "/console.js", cancellationToken);
+        using var requests = await client.GetAsync(ConsolePath + "/requests.js", cancellationToken);
         using var stylesheet = await client.GetAsync(ConsolePath + "/console.css", cancellationToken);
         using var signalR = await client.GetAsync(ConsolePath + "/signalr.min.js", cancellationToken);
 
@@ -36,6 +37,8 @@ public sealed class SignalRConsoleConfigurationTests
         page.ShouldContain("SignalR console");
         script.StatusCode.ShouldBe(HttpStatusCode.OK);
         script.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.JavaScript);
+        requests.StatusCode.ShouldBe(HttpStatusCode.OK);
+        requests.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.JavaScript);
         stylesheet.StatusCode.ShouldBe(HttpStatusCode.OK);
         stylesheet.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.Css);
         signalR.StatusCode.ShouldBe(HttpStatusCode.OK);

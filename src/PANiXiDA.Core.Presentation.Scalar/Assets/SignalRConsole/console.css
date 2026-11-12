@@ -81,6 +81,10 @@ body.dark-mode #panixida-signalr-console {
     min-width: 0;
 }
 
+#panixida-signalr-console textarea {
+    font-family: var(--scalar-font-code, ui-monospace, monospace);
+}
+
 #panixida-signalr-console button:not(:disabled) {
     cursor: pointer;
 }
@@ -112,4 +116,20 @@ body.dark-mode #panixida-signalr-console {
     border-top: 1px solid var(--console-border);
     overflow-wrap: anywhere;
     white-space: pre-wrap;
+}
+
+.signalr-test-request {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--scalar-border-color);
+    border-radius: 6px;
+    background: var(--scalar-background-2);
+    color: var(--scalar-color-1);
+    font: inherit;
+    font-size: var(--scalar-small, 0.875rem);
+    cursor: pointer;
+}
+
+.signalr-test-request:hover {
+    background: var(--scalar-background-3);
 }

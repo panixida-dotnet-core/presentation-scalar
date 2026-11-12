@@ -29,6 +29,7 @@ internal static partial class SignalRConsoleConfiguration
     internal static void MapSignalRConsole(this WebApplication app)
     {
         MapAsset(app, "console.js", MediaTypeNames.Text.JavaScript);
+        MapAsset(app, "requests.js", MediaTypeNames.Text.JavaScript);
         MapAsset(app, "console.css", MediaTypeNames.Text.Css);
         MapAsset(app, "signalr.min.js", MediaTypeNames.Text.JavaScript);
     }

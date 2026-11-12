@@ -127,7 +127,7 @@ HTTP owns module/version discovery through `HttpModules`. SignalR owns hub metad
 
 Open **SignalR console** in Scalar, select a hub, enter a bearer token if required, and click **Connect**. The console lists same-origin hubs whose AsyncAPI bindings advertise WebSockets and the SignalR JSON protocol. The page keeps the token in memory and sends it through the SignalR client's authentication flow.
 
-Incoming events appear in **Messages**. Select or enter a hub method, supply its arguments as a JSON array, and use **Invoke** to see the reply or **Send** for a one-way command. Use **Stream** for documented streaming methods and provide one JSON array of items per documented input stream. **Hide** keeps the connection open while you use Scalar's HTTP tools. **Disconnect** closes it.
+Incoming events appear in **Messages**. Use **Test Request** beside a documented hub method to open the console with its hub, method and example arguments selected. The console uses a message example when available and builds arguments from the payload schema otherwise. Use **Invoke** to see the reply, **Send** for a one-way command, or **Stream** for a streaming method. **Hide** keeps the connection open while you use Scalar's HTTP tools. **Disconnect** closes it.
 
 The package serves the official `@microsoft/signalr` 10.0.11 browser bundle locally. The bundle comes from `dist/browser/signalr.min.js` in the npm package, with its source map reference removed.
 

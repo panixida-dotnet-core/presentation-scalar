@@ -1,14 +1,16 @@
+import { addTestRequests, getRequestArguments, scalarSlug } from './requests.js';
+
 const connected = 'Connected';
 const disconnected = 'Disconnected';
 
-export async function initializeConsole(root) {
+async function initializeConsole(root) {
     if (!root) {
         return;
     }
 
-    const hubs = await loadHubs(JSON.parse(root.dataset.documents), root.dataset.pathBase);
+    const { hubs, requests } = await loadHubs(JSON.parse(root.dataset.documents), root.dataset.pathBase);
     if (hubs.length > 0) {
-        mountConsole(root, hubs);
+        mountConsole(root, hubs, requests);
     }
 }
 
@@ -28,18 +30,19 @@ async function loadHubs(paths, pathBase) {
     }));
 
     const hubs = new Map();
+    const requests = new Map();
     for (const document of documents) {
         if (document.status === 'fulfilled') {
-            readOperations(document.value, pathBase, hubs);
+            readOperations(document.value, pathBase, hubs, requests);
         }
     }
 
-    return [...hubs.values()];
+    return { hubs: [...hubs.values()], requests };
 }
 
-function readOperations(document, pathBase, hubs) {
+function readOperations(document, pathBase, hubs, requests) {
     const channelPrefix = '#/channels/';
-    for (const operation of Object.values(document?.operations ?? {})) {
+    for (const [operationId, operation] of Object.entries(document?.operations ?? {})) {
         const binding = operation?.bindings?.['x-signalr'];
         const reference = operation?.channel?.$ref;
         if (!Array.isArray(binding?.protocols) || !binding.protocols.includes('json') ||
@@ -61,13 +64,24 @@ function readOperations(document, pathBase, hubs) {
             hubs.set(url.href, hub);
         }
 
-        if (operation.action === 'receive') {
-            hub.methods.set(binding.target.toLowerCase(), {
+        if (operation.action === 'receive' && binding.messageType !== 'streamItem') {
+            const method = {
                 target: binding.target,
                 title: operation.title ?? binding.target,
                 streamResult: binding.streamResult === true,
                 inputStreams: Array.isArray(binding.inputStreams) ? binding.inputStreams : []
+            };
+            hub.methods.set(binding.target.toLowerCase(), method);
+
+            const anchor = 'channel/' + scalarSlug(channelKey) + '/operation/' + scalarSlug(operationId);
+            const candidates = requests.get(anchor) ?? [];
+            candidates.push({
+                documentSlug: scalarSlug(document.info?.title ?? ''),
+                hub,
+                method,
+                arguments: () => getRequestArguments(document, operation)
             });
+            requests.set(anchor, candidates);
         }
     }
 }
@@ -81,7 +95,7 @@ function sameOriginUrl(path, pathBase) {
     return url.origin === location.origin && !url.search && !url.hash ? url : null;
 }
 
-function mountConsole(root, hubs) {
+function mountConsole(root, hubs, requests) {
     const dialog = root.querySelector('dialog');
     const open = root.querySelector('[data-open]');
     const connectionForm = root.querySelector('[data-connection]');
@@ -89,6 +103,7 @@ function mountConsole(root, hubs) {
     const hubSelect = connectionForm.elements.hub;
     const tokenInput = connectionForm.elements.token;
     const methodInput = commandForm.elements.method;
+    const argumentsInput = commandForm.elements.arguments;
     const uploadsField = root.querySelector('[data-uploads]');
     const methods = root.querySelector('datalist');
     const messages = root.querySelector('[role="log"]');
@@ -98,6 +113,9 @@ function mountConsole(root, hubs) {
     const send = commandForm.querySelector('[value="send"]');
     let connection = null;
     let status = disconnected;
+    let transition = Promise.resolve();
+    let requestId = 0;
+    let opener = open;
 
     const selectedHub = () => hubs[Number(hubSelect.value)];
     const selectedMethod = () => selectedHub().methods.get(methodInput.value.trim().toLowerCase());
@@ -136,11 +154,51 @@ function mountConsole(root, hubs) {
 
     function updateHub() {
         methodInput.value = '';
-        commandForm.elements.arguments.value = '[]';
+        argumentsInput.value = '[]';
+        argumentsInput.rows = 2;
         commandForm.elements.uploads.value = '';
         methods.replaceChildren(...Array.from(selectedHub().methods.values(),
             method => new Option(method.title, method.target)));
         updateControls();
+    }
+
+    function openConsole(trigger) {
+        opener = trigger;
+        open.hidden = true;
+        if (!dialog.open) {
+            dialog.show();
+        }
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function openRequest(request, trigger) {
+        const id = ++requestId;
+        openConsole(trigger);
+        if (request.hub !== selectedHub()) {
+            await transition;
+            if (id !== requestId) {
+                return;
+            }
+            if (status === connected) {
+                transition = stop();
+                await transition;
+            }
+            if (id !== requestId || status !== disconnected) {
+                return;
+            }
+            hubSelect.value = String(hubs.indexOf(request.hub));
+            updateHub();
+        }
+
+        methodInput.value = request.method.target;
+        const example = JSON.stringify(request.arguments(), null, 2);
+        argumentsInput.value = example;
+        argumentsInput.rows = Math.min(8, Math.max(2, example.split('\n').length));
+        commandForm.elements.uploads.value = JSON.stringify(request.method.inputStreams.map(() => []));
+        updateControls();
+        argumentsInput.focus();
+        argumentsInput.setSelectionRange(0, 0);
+        argumentsInput.scrollTop = 0;
     }
 
     async function start(event) {
@@ -212,7 +270,7 @@ function mountConsole(root, hubs) {
         const token = tokenInput.value.trim().replace(/^Bearer\s+/i, '');
         const fail = error => write('Error', target, redact(error, token));
         try {
-            const args = readArray(commandForm.elements.arguments.value, 'Arguments');
+            const args = readArray(argumentsInput.value, 'Arguments');
             const uploads = createUploads(window.signalR, commandForm.elements.uploads.value, method?.inputStreams);
             const parameters = args.concat(uploads.map(upload => upload.subject));
             const mode = event.submitter?.value ?? 'invoke';
@@ -242,24 +300,21 @@ function mountConsole(root, hubs) {
         hubSelect.add(new Option(hub.address, String(index)));
     }
 
-    open.addEventListener('click', () => {
-        open.hidden = true;
-        dialog.show();
-        messages.scrollTop = messages.scrollHeight;
-    });
+    open.addEventListener('click', () => openConsole(open));
     root.querySelector('[data-hide]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
         open.hidden = false;
-        open.focus();
+        (opener.isConnected ? opener : open).focus();
     });
     root.querySelector('[data-clear]').addEventListener('click', () => messages.replaceChildren());
-    connectionForm.addEventListener('submit', start);
-    disconnect.addEventListener('click', stop);
+    connectionForm.addEventListener('submit', event => { transition = start(event); });
+    disconnect.addEventListener('click', () => { transition = stop(); });
     commandForm.addEventListener('submit', submitCommand);
     hubSelect.addEventListener('change', updateHub);
     methodInput.addEventListener('input', updateControls);
     updateHub();
     root.hidden = false;
+    addTestRequests(requests, openRequest);
 }
 
 let signalRLoad;
