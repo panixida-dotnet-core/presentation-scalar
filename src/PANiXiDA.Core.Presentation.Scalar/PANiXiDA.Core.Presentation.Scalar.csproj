@@ -28,5 +28,8 @@
     <ItemGroup>
         <EmbeddedResource Include="Assets/SignalRConsole/console.*;Assets/SignalRConsole/signalr.min.js" />
         <None Update="Assets/SignalRConsole/signalr.*.txt" Pack="true" PackagePath="licenses/%(Filename)%(Extension)" />
+        <SonarQubeSetting Include="sonar.coverage.exclusions">
+            <Value>**/Assets/SignalRConsole/*.js</Value>
+        </SonarQubeSetting>
     </ItemGroup>
 </Project>
