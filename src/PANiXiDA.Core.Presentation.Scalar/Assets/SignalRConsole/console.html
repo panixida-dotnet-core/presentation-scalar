@@ -10,7 +10,7 @@
         <div class="signalr-actions">
             <button type="submit" data-primary>Connect</button>
             <button type="button" data-disconnect disabled>Disconnect</button>
-            <output role="status" data-status>Disconnected</output>
+            <output data-status>Disconnected</output>
         </div>
     </form>
     <form data-command>
@@ -19,7 +19,9 @@
         </label>
         <datalist id="panixida-signalr-methods"></datalist>
         <label>Arguments (JSON array) <textarea name="arguments" rows="2" spellcheck="false">[]</textarea></label>
-        <label data-uploads hidden><span></span><textarea name="uploads" rows="2" spellcheck="false"></textarea></label>
+        <label data-uploads hidden>Upload streams (JSON arrays)<span></span>
+            <textarea name="uploads" rows="2" spellcheck="false"></textarea>
+        </label>
         <div class="signalr-actions">
             <button type="submit" value="invoke" data-primary disabled>Invoke</button>
             <button type="submit" value="send" disabled>Send</button>

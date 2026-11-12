@@ -226,6 +226,13 @@ dotnet format
 dotnet test --configuration Release
 ```
 
+Run the SignalR console tests with Node.js 24:
+
+```shell
+npm ci --ignore-scripts --prefix tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/SignalRConsole
+node --test tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/SignalRConsole/console.test.mjs
+```
+
 ### Coverage
 
 ```shell

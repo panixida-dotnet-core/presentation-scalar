@@ -22,11 +22,45 @@ jobs:
           registry-user: ${{ secrets.REGISTRY_USER }}
           registry-token: ${{ secrets.REGISTRY_TOKEN }}
 
-    sonar:
+    console-tests:
         needs: tests
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v7
+            with:
+              ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          - uses: actions/setup-node@v7
+            with:
+              node-version: 24
+          - name: Install console test dependencies
+            run: npm ci --ignore-scripts --prefix tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/SignalRConsole
+          - name: Test the SignalR console
+            run: |
+              node --test --experimental-test-coverage \
+                --test-coverage-include='src/**/SignalRConsole/console.js' \
+                --test-reporter=spec --test-reporter-destination=stdout \
+                --test-reporter=lcov --test-reporter-destination="$RUNNER_TEMP/console.lcov" \
+                tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/SignalRConsole/console.test.mjs
+          - uses: actions/download-artifact@v8
+            with:
+              name: dotnet-coverage-sonarqube
+              path: tests-report/sonar
+          - name: Include console coverage in the SonarQube report
+            run: |
+              node tests/PANiXiDA.Core.Presentation.Scalar.UnitTests/SignalRConsole/merge-coverage.mjs \
+                "$RUNNER_TEMP/console.lcov" tests-report/sonar/SonarQube.xml
+          - uses: actions/upload-artifact@v7
+            with:
+              name: scalar-coverage-sonarqube
+              path: tests-report/sonar/SonarQube.xml
+              if-no-files-found: error
+
+    sonar:
+        needs: console-tests
         uses: PANiXiDA-Infrastructure/ci-cd/.github/workflows/dotnet-sonar.yml@main
         with:
           project-key: ${{ vars.SONAR_PROJECT_KEY }}
+          coverage-artifact: scalar-coverage-sonarqube
         secrets:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           registry-user: ${{ secrets.REGISTRY_USER }}

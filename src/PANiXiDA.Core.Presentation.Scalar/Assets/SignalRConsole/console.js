@@ -1,8 +1,11 @@
-const root = document.getElementById('panixida-signalr-console');
 const connected = 'Connected';
 const disconnected = 'Disconnected';
 
-if (root) {
+export async function initializeConsole(root) {
+    if (!root) {
+        return;
+    }
+
     const hubs = await loadHubs(JSON.parse(root.dataset.documents), root.dataset.pathBase);
     if (hubs.length > 0) {
         mountConsole(root, hubs);
@@ -127,7 +130,7 @@ function mountConsole(root, hubs) {
         invoke.textContent = streamResult ? 'Stream' : 'Invoke';
         send.disabled = !ready || streamResult;
         uploadsField.hidden = inputs.length === 0;
-        uploadsField.querySelector('span').textContent = 'Upload streams (JSON arrays): ' + inputs.join(', ');
+        uploadsField.querySelector('span').textContent = inputs.join(', ');
         commandForm.elements.uploads.placeholder = JSON.stringify(inputs.map(() => []));
     }
 
@@ -210,7 +213,7 @@ function mountConsole(root, hubs) {
         const fail = error => write('Error', target, redact(error, token));
         try {
             const args = readArray(commandForm.elements.arguments.value, 'Arguments');
-            const uploads = createUploads(window.signalR, method?.inputStreams, commandForm.elements.uploads.value);
+            const uploads = createUploads(window.signalR, commandForm.elements.uploads.value, method?.inputStreams);
             const parameters = args.concat(uploads.map(upload => upload.subject));
             const mode = event.submitter?.value ?? 'invoke';
 
@@ -299,13 +302,13 @@ function observeCallbacks(signalR, onEvent) {
 function readArray(value, label) {
     const parsed = JSON.parse(value);
     if (!Array.isArray(parsed)) {
-        throw new Error(label + ' must be a JSON array.');
+        throw new TypeError(label + ' must be a JSON array.');
     }
 
     return parsed;
 }
 
-function createUploads(signalR, names = [], value) {
+function createUploads(signalR, value, names = []) {
     if (names.length === 0) {
         return [];
     }
@@ -332,3 +335,5 @@ function redact(error, token) {
     const message = error instanceof Error ? error.message : String(error);
     return token ? message.replaceAll(token, '[redacted]').replaceAll(encodeURIComponent(token), '[redacted]') : message;
 }
+
+await initializeConsole(document.getElementById('panixida-signalr-console'));

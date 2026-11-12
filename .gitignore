@@ -5,3 +5,4 @@
 .vs/
 .idea
 TestResults/
+node_modules/
