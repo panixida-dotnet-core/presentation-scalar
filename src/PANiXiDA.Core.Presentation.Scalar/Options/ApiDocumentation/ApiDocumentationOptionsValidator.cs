@@ -6,13 +6,19 @@ internal sealed class ApiDocumentationOptionsValidator : IValidateOptions<ApiDoc
 {
     public ValidateOptionsResult Validate(string? name, ApiDocumentationOptions options)
     {
-        if (string.IsNullOrWhiteSpace(options.Favicon)
-            || Uri.IsWellFormedUriString(options.Favicon, UriKind.RelativeOrAbsolute))
+        if (!string.IsNullOrWhiteSpace(options.Favicon)
+            && !Uri.IsWellFormedUriString(options.Favicon, UriKind.RelativeOrAbsolute))
         {
-            return ValidateOptionsResult.Success;
+            return ValidateOptionsResult.Fail(
+                $"{ApiDocumentationOptions.SectionName}:{nameof(ApiDocumentationOptions.Favicon)} must be a well-formed relative or absolute URI.");
         }
 
-        return ValidateOptionsResult.Fail(
-            $"{ApiDocumentationOptions.SectionName}:{nameof(ApiDocumentationOptions.Favicon)} must be a well-formed relative or absolute URI.");
+        if (options.AsyncApiCacheDuration <= TimeSpan.Zero)
+        {
+            return ValidateOptionsResult.Fail(
+                $"{ApiDocumentationOptions.SectionName}:{nameof(ApiDocumentationOptions.AsyncApiCacheDuration)} must be greater than zero when set.");
+        }
+
+        return ValidateOptionsResult.Success;
     }
 }

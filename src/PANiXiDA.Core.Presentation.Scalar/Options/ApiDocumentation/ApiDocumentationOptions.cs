@@ -9,6 +9,9 @@ public sealed class ApiDocumentationOptions
     /// <summary>Gets or sets whether documentation is enabled; null enables it only in Development.</summary>
     public bool? Enabled { get; set; }
 
+    /// <summary>Gets or sets the AsyncAPI response cache lifetime. A null value disables caching.</summary>
+    public TimeSpan? AsyncApiCacheDuration { get; set; }
+
     /// <summary>Gets or sets the reference page title.</summary>
     public string? Title { get; set; }
 

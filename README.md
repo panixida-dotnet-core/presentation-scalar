@@ -151,11 +151,16 @@ Settings bind from the existing `ScalarConfiguration` section:
 | Setting | Default | Behavior |
 | --- | --- | --- |
 | `Enabled` | `null` | Enable only in Development; explicit true/false overrides the environment |
+| `AsyncApiCacheDuration` | `null` | Cache AsyncAPI responses for the configured duration, for example `00:10:00` |
 | `Title` | Scalar default | Set the reference page title when nonblank |
 | `Favicon` | Scalar default | Use a relative or absolute favicon URI |
 | `SortOperations` | `true` | Apply default HTTP ordering unless an explicit sorter/JavaScript configuration is supplied |
 
 The web host owns access control for documentation. Enabling the UI outside Development exposes the configured documents through the application's normal endpoint pipeline.
+
+### Cache AsyncAPI documents
+
+Set `ScalarConfiguration:AsyncApiCacheDuration` to a positive duration such as `00:10:00` when generated documents can be reused for requests with the same URL. The default ASP.NET Core output cache stores each document response in memory per application instance. Authenticated requests and requests with an `Authorization` header bypass the default cache policy. The first request after expiry generates a fresh document.
 
 ### Favicon and static assets
 

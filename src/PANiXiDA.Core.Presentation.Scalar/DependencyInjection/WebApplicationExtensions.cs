@@ -41,7 +41,7 @@ public static class WebApplicationExtensions
             throw new InvalidOperationException("No API document sources were registered. Register HTTP, SignalR or Kafka documentation before UseApiDocumentation.");
         }
 
-        app.MapAsyncApi(sources);
+        app.MapAsyncApi(sources, settings.AsyncApiCacheDuration);
         if (sources.OfType<IAsyncApiDocumentSource>().Any())
         {
             app.MapSignalRConsole();
