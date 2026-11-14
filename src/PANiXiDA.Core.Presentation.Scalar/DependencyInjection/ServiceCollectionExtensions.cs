@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddOptions<ApiDocumentationOptions>()
             .Bind(configuration.GetSection(ApiDocumentationOptions.SectionName))
             .ValidateOnStart();
+        services.AddOutputCache();
 
         return services;
     }
