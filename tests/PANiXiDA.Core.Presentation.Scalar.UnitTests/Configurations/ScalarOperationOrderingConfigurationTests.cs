@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
@@ -13,10 +14,11 @@ namespace PANiXiDA.Core.Presentation.Scalar.UnitTests.Configurations;
 
 public sealed class ScalarOperationOrderingConfigurationTests
 {
-    [Theory(DisplayName = "Scalar orders HTTP creation operations through standard API Explorer metadata")]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task MapOperationOrdering_Should_ExposeScript_When_SortingIsEnabled(bool enabled)
+    [Theory(DisplayName = "Scalar exposes operation sorting through standard API Explorer metadata, including under PathBase")]
+    [InlineData(true, "")]
+    [InlineData(false, "")]
+    [InlineData(true, "/gateway")]
+    public async Task MapOperationOrdering_Should_ExposeScript_When_SortingIsEnabled(bool enabled, string pathBase)
     {
         var builder = ScalarTestHost.CreateBuilder();
         builder.Services.AddOpenApi();
@@ -25,35 +27,55 @@ public sealed class ScalarOperationOrderingConfigurationTests
         builder.Configuration["ScalarConfiguration:SortOperations"] = enabled.ToString();
         builder.Services.AddApiDocumentation(builder.Configuration);
         await using var app = builder.Build();
+        app.UsePathBase(pathBase);
         app.MapOpenApi();
         app.MapGet("/orders", static () => "orders");
         app.UseApiDocumentation();
         await app.StartAsync(TestContext.Current.CancellationToken);
         using var client = ScalarTestHost.CreateClient(app);
 
-        var page = await client.GetStringAsync("/scalar/", TestContext.Current.CancellationToken);
-        using var script = await client.GetAsync("/scalar/operation-order.js", TestContext.Current.CancellationToken);
+        var page = await client.GetStringAsync($"{pathBase}/scalar/", TestContext.Current.CancellationToken);
+        using var script = await client.GetAsync($"{pathBase}/scalar/operation-order.js", TestContext.Current.CancellationToken);
+        var openApi = await client.GetStringAsync($"{pathBase}/openapi/v1.json", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(openApi);
 
         script.StatusCode.ShouldBe(HttpStatusCode.OK);
         script.Content.Headers.ContentType!.MediaType.ShouldBe(enabled ? "text/javascript" : "text/html");
+        document.RootElement.GetProperty("paths").TryGetProperty("/scalar/operation-order.js", out _).ShouldBeFalse();
         if (enabled)
         {
             var code = await script.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
             code.ShouldContain("/orders");
             code.ShouldNotContain("/ignored");
-            page.ShouldContain("scalar/operation-order.js");
-            (await client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken)).ShouldContain("openapi");
+            page.ShouldContain("'scalar/operation-order.js'");
+            page.ShouldNotContain("'/scalar/operation-order.js'");
+        }
+        else
+        {
+            page.ShouldNotContain("scalar/operation-order.js");
         }
     }
 
-    [Fact(DisplayName = "Explicit JavaScript configuration takes precedence over default sorting")]
-    public async Task ConfigureOperationSorting_Should_PreserveExplicitJavaScriptConfiguration()
+    [Theory(DisplayName = "Explicit host sorting configuration takes precedence over default sorting")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConfigureOperationSorting_Should_PreserveExplicitHostConfiguration(bool useJavaScript)
     {
         var builder = ScalarTestHost.CreateBuilder();
         builder.Services.AddSingleton<IApiDescriptionGroupCollectionProvider, ExampleDescriptions>();
         builder.Services.AddApiDocumentSource<OpenApiTestSource>();
         builder.Services.AddApiDocumentation(builder.Configuration);
-        builder.Services.Configure<ScalarOptions>(options => options.WithJavaScriptConfiguration("custom-sort.js"));
+        builder.Services.Configure<ScalarOptions>(options =>
+        {
+            if (useJavaScript)
+            {
+                options.WithJavaScriptConfiguration("custom-sort.js");
+            }
+            else
+            {
+                options.OperationSorter = OperationSorter.Method;
+            }
+        });
         await using var app = builder.Build();
         app.UseApiDocumentation();
         await app.StartAsync(TestContext.Current.CancellationToken);
@@ -61,7 +83,7 @@ public sealed class ScalarOperationOrderingConfigurationTests
 
         var page = await client.GetStringAsync("/scalar/", TestContext.Current.CancellationToken);
 
-        page.ShouldContain("custom-sort.js");
+        page.ShouldContain(useJavaScript ? "custom-sort.js" : "\"operationsSorter\":\"method\"");
         page.ShouldNotContain("scalar/operation-order.js");
     }
 
