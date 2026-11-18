@@ -16,6 +16,7 @@ public sealed class SignalRConsoleConfigurationTests
         const string ConsolePath = PathBase + "/scalar/signalr-console";
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = ScalarTestHost.CreateBuilder();
+        builder.Services.AddApiDocumentSource<OpenApiTestSource>();
         builder.Services.AddApiDocumentSource<AsyncApiTestSource>();
         builder.Services.AddApiDocumentation(builder.Configuration);
         await using var app = builder.Build();
@@ -33,8 +34,11 @@ public sealed class SignalRConsoleConfigurationTests
         page.ShouldContain($"src=\"{ConsolePath}/console.js\"");
         page.ShouldContain($"href=\"{ConsolePath}/console.css\"");
         page.ShouldContain($"data-path-base=\"{PathBase}\"");
-        page.ShouldContain("data-documents=\"[&quot;/asyncapi/events-v1.json&quot;]\"");
-        page.ShouldContain("SignalR console");
+        page.ShouldContain("{&quot;title&quot;:&quot;Events&quot;,&quot;path&quot;:&quot;/asyncapi/events-v1.json&quot;}");
+        page.ShouldContain("&quot;path&quot;:null");
+        page.ShouldContain("<dialog aria-labelledby=\"panixida-signalr-title\"");
+        page.ShouldNotContain("data-open");
+        page.ShouldNotContain("name=\"hub\"");
         script.StatusCode.ShouldBe(HttpStatusCode.OK);
         script.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.JavaScript);
         requests.StatusCode.ShouldBe(HttpStatusCode.OK);
