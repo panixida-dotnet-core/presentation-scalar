@@ -1,4 +1,4 @@
-import { addTestRequests, getRequestArguments, scalarSlug } from './requests.js';
+import { addDocumentRequests, addTestRequests, getDocumentPaths } from './requests.js';
 
 const connected = 'Connected';
 const disconnected = 'Disconnected';
@@ -8,14 +8,14 @@ async function initializeConsole(root) {
         return;
     }
 
-    const { hubs, requests } = await loadHubs(JSON.parse(root.dataset.documents), root.dataset.pathBase);
-    if (hubs.length > 0) {
-        mountConsole(root, hubs, requests);
+    const requests = await loadRequests(getDocumentPaths(JSON.parse(root.dataset.documents)), root.dataset.pathBase);
+    if (requests.size > 0) {
+        mountConsole(root, requests);
     }
 }
 
-async function loadHubs(paths, pathBase) {
-    const documents = await Promise.allSettled(paths.map(async path => {
+async function loadRequests(paths, pathBase) {
+    const documents = await Promise.allSettled(paths.map(async ([slug, path]) => {
         const url = sameOriginUrl(path, pathBase);
         if (!url) {
             throw new Error('Expected a local AsyncAPI document.');
@@ -26,64 +26,17 @@ async function loadHubs(paths, pathBase) {
             throw new Error('Could not load the AsyncAPI document.');
         }
 
-        return response.json();
+        return [slug, await response.json()];
     }));
 
-    const hubs = new Map();
     const requests = new Map();
     for (const document of documents) {
         if (document.status === 'fulfilled') {
-            readOperations(document.value, pathBase, hubs, requests);
+            const [slug, source] = document.value;
+            addDocumentRequests(requests, slug, source, address => sameOriginUrl(address, pathBase));
         }
     }
-
-    return { hubs: [...hubs.values()], requests };
-}
-
-function readOperations(document, pathBase, hubs, requests) {
-    const channelPrefix = '#/channels/';
-    for (const [operationId, operation] of Object.entries(document?.operations ?? {})) {
-        const binding = operation?.bindings?.['x-signalr'];
-        const reference = operation?.channel?.$ref;
-        if (!Array.isArray(binding?.protocols) || !binding.protocols.includes('json') ||
-            !Array.isArray(binding.transports) || !binding.transports.includes('WebSockets') ||
-            typeof reference !== 'string' || !reference.startsWith(channelPrefix) || typeof binding.target !== 'string') {
-            continue;
-        }
-
-        const channelKey = reference.slice(channelPrefix.length).replaceAll('~1', '/').replaceAll('~0', '~');
-        const address = document.channels?.[channelKey]?.address;
-        const url = sameOriginUrl(address, pathBase);
-        if (!url) {
-            continue;
-        }
-
-        let hub = hubs.get(url.href);
-        if (!hub) {
-            hub = { url, address, methods: new Map() };
-            hubs.set(url.href, hub);
-        }
-
-        if (operation.action === 'receive' && binding.messageType !== 'streamItem') {
-            const method = {
-                target: binding.target,
-                title: operation.title ?? binding.target,
-                streamResult: binding.streamResult === true,
-                inputStreams: Array.isArray(binding.inputStreams) ? binding.inputStreams : []
-            };
-            hub.methods.set(binding.target.toLowerCase(), method);
-
-            const anchor = 'channel/' + scalarSlug(channelKey) + '/operation/' + scalarSlug(operationId);
-            const candidates = requests.get(anchor) ?? [];
-            candidates.push({
-                documentSlug: scalarSlug(document.info?.title ?? ''),
-                hub,
-                method,
-                arguments: () => getRequestArguments(document, operation)
-            });
-            requests.set(anchor, candidates);
-        }
-    }
+    return requests;
 }
 
 function sameOriginUrl(path, pathBase) {
@@ -95,126 +48,173 @@ function sameOriginUrl(path, pathBase) {
     return url.origin === location.origin && !url.search && !url.hash ? url : null;
 }
 
-function mountConsole(root, hubs, requests) {
+function createEntry({ kind, target, time, payload }) {
+    const item = document.createElement('li');
+    item.dataset.kind = kind;
+    const heading = document.createElement('div');
+    const timestamp = document.createElement('time');
+    timestamp.dateTime = time.toISOString();
+    timestamp.textContent = time.toLocaleTimeString();
+    const label = document.createElement('span');
+    label.textContent = kind;
+    const name = document.createElement('code');
+    name.textContent = target;
+    heading.append(timestamp, label, name);
+    item.append(heading);
+    if (payload !== undefined) {
+        const body = document.createElement('pre');
+        body.textContent = payload;
+        item.append(body);
+    }
+    return item;
+}
+
+function selectMethod(session, method) {
+    session.method = method;
+    session.arguments = JSON.stringify(method.arguments(), null, 2);
+    session.uploads = JSON.stringify(method.inputStreams.map(() => []), null, 2);
+}
+
+function mountConsole(root, requests) {
     const dialog = root.querySelector('dialog');
-    const open = root.querySelector('[data-open]');
-    const connectionForm = root.querySelector('[data-connection]');
+    const title = root.querySelector('h2');
+    const address = root.querySelector('[data-address]');
+    const connectionForm = root.querySelector('#panixida-signalr-connection');
     const commandForm = root.querySelector('[data-command]');
-    const hubSelect = connectionForm.elements.hub;
     const tokenInput = connectionForm.elements.token;
-    const methodInput = commandForm.elements.method;
+    const methodSelect = commandForm.elements.method;
     const argumentsInput = commandForm.elements.arguments;
+    const uploadsInput = commandForm.elements.uploads;
     const uploadsField = root.querySelector('[data-uploads]');
-    const methods = root.querySelector('datalist');
-    const messages = root.querySelector('[role="log"]');
+    const events = root.querySelector('[data-events]');
+    const journal = root.querySelector('.signalr-journal');
+    const messages = journal.querySelector('ol');
+    const emptyLog = journal.querySelector('[data-empty]');
+    const statusOutput = root.querySelector('[data-status]');
     const disconnect = root.querySelector('[data-disconnect]');
-    const connect = connectionForm.querySelector('button[type="submit"]');
+    const connect = root.querySelector('[data-connect]');
     const invoke = commandForm.querySelector('[value="invoke"]');
     const send = commandForm.querySelector('[value="send"]');
-    let connection = null;
-    let status = disconnected;
-    let transition = Promise.resolve();
-    let requestId = 0;
-    let opener = open;
+    const sessions = new Map();
+    let current;
+    let opener;
 
-    const selectedHub = () => hubs[Number(hubSelect.value)];
-    const selectedMethod = () => selectedHub().methods.get(methodInput.value.trim().toLowerCase());
-
-    function write(kind, target, value) {
-        const item = document.createElement('li');
-        const payload = value === undefined ? '' : '\n' + JSON.stringify(value, null, 2).slice(0, 16384);
-        item.textContent = new Date().toLocaleTimeString() + '  ' + kind + '  ' + target + payload;
-        messages.append(item);
-        if (messages.childElementCount > 150) {
-            messages.firstElementChild.remove();
+    function write(session, kind, target, value, token = '') {
+        const entry = {
+            kind,
+            target: redact(target, token),
+            time: new Date(),
+            payload: value === undefined ? undefined : redact(JSON.stringify(value, null, 2), token).slice(0, 16384)
+        };
+        session.entries.push(entry);
+        const trim = session.entries.length > 150;
+        if (trim) {
+            session.entries.shift();
         }
 
-        messages.scrollTop = messages.scrollHeight;
+        if (current === session && dialog.open) {
+            const atBottom = journal.scrollHeight - journal.scrollTop - journal.clientHeight <= 12;
+            emptyLog.hidden = true;
+            messages.append(createEntry(entry));
+            if (trim) {
+                messages.firstElementChild.remove();
+            }
+            if (atBottom) {
+                journal.scrollTop = journal.scrollHeight;
+            }
+        }
     }
 
-    function updateControls() {
-        const ready = status === connected;
-        const idle = status === disconnected;
-        const method = selectedMethod();
-        const inputs = method?.inputStreams ?? [];
-        const streamResult = method?.streamResult ?? false;
+    function updateStatus(session) {
+        if (current !== session) {
+            return;
+        }
 
-        root.querySelector('[data-status]').textContent = status;
-        hubSelect.disabled = !idle;
+        const ready = session.status === connected;
+        const idle = session.status === disconnected;
+        statusOutput.textContent = ready ? 'Connected · JSON · WebSockets' : session.status;
+        statusOutput.dataset.connected = String(ready);
         tokenInput.disabled = !idle;
+        connect.hidden = ready || session.status === 'Disconnecting…';
         connect.disabled = !idle;
+        connect.textContent = session.status === 'Connecting…' ? session.status : 'Connect';
+        disconnect.hidden = !connect.hidden;
         disconnect.disabled = !ready;
-        invoke.disabled = !ready;
-        invoke.textContent = streamResult ? 'Stream' : 'Invoke';
-        send.disabled = !ready || streamResult;
+        invoke.disabled = !ready || !session.method;
+        send.disabled = !ready || !session.method || session.method.streamResult;
+        emptyLog.textContent = ready ? 'Waiting for messages from the hub.' : 'Connect to receive messages.';
+        emptyLog.hidden = session.entries.length > 0;
+    }
+
+    function renderMethod(session) {
+        const method = session.method;
+        const inputs = method?.inputStreams ?? [];
+        if (method) {
+            methodSelect.value = method.target.toLowerCase();
+            argumentsInput.value = session.arguments;
+            uploadsInput.value = session.uploads;
+        }
         uploadsField.hidden = inputs.length === 0;
         uploadsField.querySelector('span').textContent = inputs.join(', ');
-        commandForm.elements.uploads.placeholder = JSON.stringify(inputs.map(() => []));
+        invoke.textContent = method?.streamResult ? 'Stream' : 'Invoke';
+        send.hidden = method?.streamResult === true;
+        updateStatus(session);
     }
 
-    function updateHub() {
-        methodInput.value = '';
-        argumentsInput.value = '[]';
-        argumentsInput.rows = 2;
-        commandForm.elements.uploads.value = '';
-        methods.replaceChildren(...Array.from(selectedHub().methods.values(),
-            method => new Option(method.title, method.target)));
-        updateControls();
-    }
+    function openRequest({ hub, method }, trigger) {
+        let session = sessions.get(hub);
+        if (!session) {
+            session = { hub, status: disconnected, connection: null, token: '', entries: [] };
+            sessions.set(hub, session);
+        }
 
-    function openConsole(trigger) {
+        const selected = method ?? session.method ?? hub.methods.values().next().value;
+        if (selected && (method || session.method !== selected)) {
+            selectMethod(session, selected);
+        }
+
+        current = session;
         opener = trigger;
-        open.hidden = true;
+        title.textContent = hub.title;
+        address.textContent = hub.url.href;
+        tokenInput.value = session.token;
+        commandForm.hidden = hub.methods.size === 0;
+        methodSelect.replaceChildren(...Array.from(hub.methods, ([key, item]) => new Option(item.title, key)));
+        events.replaceChildren(...Array.from(hub.events.values(), target => {
+            const entry = document.createElement('li');
+            const name = document.createElement('code');
+            name.textContent = target;
+            entry.append(name);
+            return entry;
+        }));
+        root.querySelector('[data-no-events]').hidden = hub.events.size > 0;
+        messages.replaceChildren(...session.entries.map(createEntry));
+        renderMethod(session);
+
         if (!dialog.open) {
-            dialog.show();
+            dialog.showModal();
         }
-        messages.scrollTop = messages.scrollHeight;
-    }
-
-    async function openRequest(request, trigger) {
-        const id = ++requestId;
-        openConsole(trigger);
-        if (request.hub !== selectedHub()) {
-            await transition;
-            if (id !== requestId) {
-                return;
-            }
-            if (status === connected) {
-                transition = stop();
-                await transition;
-            }
-            if (id !== requestId || status !== disconnected) {
-                return;
-            }
-            hubSelect.value = String(hubs.indexOf(request.hub));
-            updateHub();
-        }
-
-        methodInput.value = request.method.target;
-        const example = JSON.stringify(request.arguments(), null, 2);
-        argumentsInput.value = example;
-        argumentsInput.rows = Math.min(8, Math.max(2, example.split('\n').length));
-        commandForm.elements.uploads.value = JSON.stringify(request.method.inputStreams.map(() => []));
-        updateControls();
-        argumentsInput.focus();
-        argumentsInput.setSelectionRange(0, 0);
-        argumentsInput.scrollTop = 0;
+        journal.scrollTop = journal.scrollHeight;
     }
 
     async function start(event) {
         event.preventDefault();
-        if (status !== disconnected) {
+        const session = current;
+        if (session?.status !== disconnected) {
             return;
         }
 
-        status = 'Connecting…';
-        updateControls();
-        const token = tokenInput.value.trim().replace(/^Bearer\s+/i, '');
-        const hub = selectedHub();
+        session.status = 'Connecting…';
+        updateStatus(session);
+        session.token = tokenInput.value;
+        const token = bearerToken(session.token);
+        const { hub } = session;
+        let candidate;
         try {
             const signalR = await loadSignalR();
-            const protocol = observeCallbacks(signalR, message => write('Event', message.target, message.arguments));
-            const candidate = new signalR.HubConnectionBuilder()
+            const protocol = observeCallbacks(signalR,
+                message => write(session, 'Event', message.target, message.arguments, token));
+            candidate = new signalR.HubConnectionBuilder()
                 .withUrl(hub.url.href, {
                     transport: signalR.HttpTransportType.WebSockets,
                     accessTokenFactory: () => token
@@ -222,99 +222,132 @@ function mountConsole(root, hubs, requests) {
                 .withHubProtocol(protocol)
                 .configureLogging(signalR.LogLevel.None)
                 .build();
-            connection = candidate;
+            session.connection = candidate;
             candidate.onclose(error => {
-                connection = null;
-                status = disconnected;
-                updateControls();
-                if (error) {
-                    write('Error', hub.address, redact(error, token));
+                if (session.connection !== candidate) {
+                    return;
                 }
+                session.connection = null;
+                session.status = disconnected;
+                write(session, error ? 'Error' : 'Connection', hub.address,
+                    error ? error.message : disconnected, token);
+                updateStatus(session);
             });
 
             await candidate.start();
-            status = connection ? connected : disconnected;
+            if (session.connection === candidate) {
+                session.status = connected;
+                write(session, 'Connection', hub.address, connected);
+            }
         } catch (error) {
-            connection = null;
-            status = disconnected;
-            write('Error', hub.address, redact(error, token));
+            if (!candidate || session.connection === candidate) {
+                session.connection = null;
+                session.status = disconnected;
+                write(session, 'Error', hub.address, error.message, token);
+            }
         }
 
-        updateControls();
+        updateStatus(session);
     }
 
     async function stop() {
-        if (status !== connected) {
+        const session = current;
+        if (session.status !== connected) {
             return;
         }
 
-        status = 'Disconnecting…';
-        updateControls();
+        session.status = 'Disconnecting…';
+        updateStatus(session);
+        const connection = session.connection;
         try {
             await connection.stop();
         } catch (error) {
-            write('Error', selectedHub().address, redact(error, tokenInput.value.trim()));
-            status = connection ? connected : disconnected;
-            updateControls();
+            if (session.connection === connection) {
+                write(session, 'Error', session.hub.address, error.message, bearerToken(session.token));
+                session.status = connected;
+                updateStatus(session);
+            }
         }
     }
 
     async function submitCommand(event) {
         event.preventDefault();
-        if (status !== connected) {
+        const session = current;
+        const method = session?.method;
+        if (!method || session.status !== connected) {
             return;
         }
 
-        const target = methodInput.value.trim();
-        const method = selectedMethod();
-        const token = tokenInput.value.trim().replace(/^Bearer\s+/i, '');
-        const fail = error => write('Error', target, redact(error, token));
+        const { target } = method;
+        const token = bearerToken(session.token);
+        const fail = error => write(session, 'Error', target, error.message, token);
         try {
-            const args = readArray(argumentsInput.value, 'Arguments');
-            const uploads = createUploads(window.signalR, commandForm.elements.uploads.value, method?.inputStreams);
+            const args = readArray(session.arguments, 'Arguments');
+            const uploads = createUploads(window.signalR, session.uploads, method.inputStreams);
             const parameters = args.concat(uploads.map(upload => upload.subject));
-            const mode = event.submitter?.value ?? 'invoke';
+            const sendOnly = event.submitter?.value === 'send';
+            const command = sendOnly ? 'Send' : 'Invoke';
+            const connection = session.connection;
 
-            write('→', target, args);
-            if (method?.streamResult) {
+            write(session, method.streamResult ? 'Stream' : command, target, args, token);
+            if (method.streamResult) {
                 connection.stream(target, ...parameters).subscribe({
-                    next: item => write('Stream item', target, item),
-                    complete: () => write('Stream completed', target),
+                    next: item => write(session, 'Stream item', target, item, token),
+                    complete: () => write(session, 'Stream completed', target),
                     error: fail
                 });
                 publishUploads(uploads);
             } else {
-                const pending = mode === 'send'
+                const pending = sendOnly
                     ? connection.send(target, ...parameters)
                     : connection.invoke(target, ...parameters);
                 publishUploads(uploads);
                 const result = await pending;
-                write(mode === 'send' ? 'Sent' : 'Reply', target, result);
+                write(session, sendOnly ? 'Sent' : 'Reply', target, result, token);
             }
         } catch (error) {
             fail(error);
         }
     }
 
-    for (const [index, hub] of hubs.entries()) {
-        hubSelect.add(new Option(hub.address, String(index)));
-    }
-
-    open.addEventListener('click', () => openConsole(open));
     root.querySelector('[data-hide]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
-        open.hidden = false;
-        (opener.isConnected ? opener : open).focus();
+        if (!dialog.open && opener.isConnected) {
+            opener.focus({ preventScroll: true });
+        }
     });
-    root.querySelector('[data-clear]').addEventListener('click', () => messages.replaceChildren());
-    connectionForm.addEventListener('submit', event => { transition = start(event); });
-    disconnect.addEventListener('click', () => { transition = stop(); });
+    root.querySelector('[data-clear]').addEventListener('click', () => {
+        current.entries.length = 0;
+        messages.replaceChildren();
+        emptyLog.hidden = false;
+    });
+    connectionForm.addEventListener('submit', start);
+    disconnect.addEventListener('click', stop);
     commandForm.addEventListener('submit', submitCommand);
-    hubSelect.addEventListener('change', updateHub);
-    methodInput.addEventListener('input', updateControls);
-    updateHub();
+    methodSelect.addEventListener('change', () => {
+        selectMethod(current, current.hub.methods.get(methodSelect.value));
+        renderMethod(current);
+    });
+    tokenInput.addEventListener('input', () => { current.token = tokenInput.value; });
+    argumentsInput.addEventListener('input', () => { current.arguments = argumentsInput.value; });
+    uploadsInput.addEventListener('input', () => { current.uploads = uploadsInput.value; });
     root.hidden = false;
     addTestRequests(requests, openRequest);
+}
+
+function bearerToken(value) {
+    return value.trim().replace(/^Bearer\s+/i, '');
+}
+
+function redact(text, token) {
+    if (!token) {
+        return text;
+    }
+    const variants = new Set([token, encodeURIComponent(token), JSON.stringify(token).slice(1, -1)]);
+    for (const variant of variants) {
+        text = text.replaceAll(variant, '[redacted]');
+    }
+    return text;
 }
 
 let signalRLoad;
@@ -384,11 +417,6 @@ function publishUploads(uploads) {
 
         subject.complete();
     }
-}
-
-function redact(error, token) {
-    const message = error instanceof Error ? error.message : String(error);
-    return token ? message.replaceAll(token, '[redacted]').replaceAll(encodeURIComponent(token), '[redacted]') : message;
 }
 
 await initializeConsole(document.getElementById('panixida-signalr-console'));

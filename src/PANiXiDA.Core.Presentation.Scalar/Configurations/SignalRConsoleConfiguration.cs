@@ -37,24 +37,25 @@ internal static partial class SignalRConsoleConfiguration
     internal static void ConfigureSignalRConsole(this ScalarOptions options, PathString pathBase,
         IEnumerable<ApiDocumentDescriptor> documents)
     {
-        var paths = documents
-            .Where(document => document.Format == ApiDocumentFormat.AsyncApi)
-            .Select(document => document.Path)
+        var sources = documents
+            .Select(document => new ConsoleDocument(document.Title,
+                document.Format == ApiDocumentFormat.AsyncApi ? document.Path : null))
             .ToArray();
-        if (paths.Length == 0)
+        if (!sources.Any(source => source.Path is not null))
         {
             return;
         }
 
         var assets = HtmlEncoder.Default.Encode(pathBase.Add(AssetPath).ToUriComponent());
-        var encodedPaths = HtmlEncoder.Default.Encode(JsonSerializer.Serialize(paths, ConsoleJsonContext.Default.StringArray));
+        var encodedSources = HtmlEncoder.Default.Encode(
+            JsonSerializer.Serialize(sources, ConsoleJsonContext.Default.ConsoleDocumentArray));
         var encodedBase = HtmlEncoder.Default.Encode(pathBase.ToUriComponent());
         options.AddHeadContent($"""
             <link rel="stylesheet" href="{assets}/console.css">
             <script type="module" src="{assets}/console.js"></script>
             """);
         options.AddHeaderContent($"""
-            <div id="panixida-signalr-console" data-documents="{encodedPaths}" data-path-base="{encodedBase}" hidden>
+            <div id="panixida-signalr-console" data-documents="{encodedSources}" data-path-base="{encodedBase}" hidden>
             {s_markup.Value}
             </div>
             """);
@@ -77,6 +78,9 @@ internal static partial class SignalRConsoleConfiguration
         app.MapGet($"{AssetPath}/{name}", (RequestDelegate)Handler).ExcludeFromDescription();
     }
 
-    [JsonSerializable(typeof(string[]))]
+    private sealed record ConsoleDocument(string Title, string? Path);
+
+    [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSerializable(typeof(ConsoleDocument[]))]
     private sealed partial class ConsoleJsonContext : JsonSerializerContext;
 }

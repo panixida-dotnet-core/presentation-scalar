@@ -21,7 +21,7 @@ The presenter owns the UI and AsyncAPI document endpoints. It has no dependency 
 - One document selector for modules, transports, and contract versions.
 - OpenAPI and AsyncAPI rendering through Scalar.
 - AsyncAPI JSON endpoints at each source's configured path.
-- A live SignalR console for documented WebSocket hubs.
+- Contextual Test Request for documented SignalR WebSocket hubs and methods.
 - Development-only availability by default, with an explicit environment override.
 - Page title, application-owned favicon, and HTTP operation sorting.
 - Shared source-generated JSON schema contexts for transport adapters.
@@ -123,11 +123,13 @@ Document titles label the selector and introduction. Document names are technica
 
 HTTP owns module/version discovery through `HttpModules`. SignalR owns hub metadata through `IDocumentedHubEndpoint`; Wolverine groups Kafka registrations with `WithDocumentation`. The presenter collects their results and does not change routes, topics, or version negotiation.
 
-### SignalR console
+### SignalR Test Request
 
-Open **SignalR console** in Scalar, select a hub, enter a bearer token if required, and click **Connect**. The console lists same-origin hubs whose AsyncAPI bindings advertise WebSockets and the SignalR JSON protocol. The page keeps the token in memory and sends it through the SignalR client's authentication flow.
+Click **Test Request** beside a SignalR channel heading or a callable hub method in Scalar. The dialog uses that channel’s fixed, same-origin address and supports hubs that advertise WebSockets and the SignalR JSON protocol. Enter a bearer token if required, then click **Connect**. The page keeps the token in memory and sends it through the SignalR client's authentication flow.
 
-Incoming events appear in **Messages**. Use **Test Request** beside a documented hub method to open the console with its hub, method and example arguments selected. The console uses a message example when available and builds arguments from the payload schema otherwise. Use **Invoke** to see the reply, **Send** for a one-way command, or **Stream** for a streaming method. **Hide** keeps the connection open while you use Scalar's HTTP tools. **Disconnect** closes it.
+The method button selects the documented method and fills in arguments from a message example or payload schema. Choose another method of the same hub to prepare its arguments while keeping the connection and message history. After connecting, use **Invoke** to see a reply, **Send** for a one-way command, or **Stream** for a streaming method. Supply one JSON array per input stream when the method accepts uploads.
+
+**Server events** lists documented callbacks, including for hubs that only publish events. Incoming callbacks, replies, stream items, and errors appear in **Messages**. Use **Minimize** or press Escape to return to the reference while the hub stays connected. For example, you can make a related HTTP request, then reopen **Test Request** on the same hub to see the events it sent. Each hub keeps its own connection and history until the page is reloaded. Use **Disconnect** to end that hub’s connection.
 
 The package serves the `@microsoft/signalr` 10.0.11 browser bundle locally. The bundle comes from `dist/browser/signalr.min.js` in the npm package. The vendored copy omits the source map reference and decrements the loop index after removing a stream in `HubConnection._replaceStreamingParams` so consecutive upload streams are all extracted.
 
@@ -229,6 +231,12 @@ dotnet format
 
 ```shell
 dotnet test --configuration Release
+```
+
+Run the SignalR request catalog tests with Node.js 22 or later:
+
+```shell
+node --test tests/signalr-console.requests.test.mjs
 ```
 
 ### Coverage

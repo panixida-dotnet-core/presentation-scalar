@@ -1,37 +1,50 @@
-<button type="button" data-open>SignalR console</button>
 <dialog aria-labelledby="panixida-signalr-title">
-    <header>
-        <h2 id="panixida-signalr-title">SignalR console</h2>
-        <button type="button" data-hide>Hide</button>
-    </header>
-    <form data-connection>
-        <label>Hub <select name="hub" required></select></label>
-        <label>Bearer token <input name="token" type="password" autocomplete="off" spellcheck="false"></label>
-        <div class="signalr-actions">
-            <button type="submit" data-primary>Connect</button>
-            <button type="button" data-disconnect disabled>Disconnect</button>
+    <header class="signalr-header">
+        <div class="signalr-endpoint">
+            <h2 id="panixida-signalr-title">SignalR Test Request</h2>
+            <code data-address></code>
+        </div>
+        <div class="signalr-connection">
+            <div class="signalr-actions">
+                <button type="submit" form="panixida-signalr-connection" data-connect data-primary>Connect</button>
+                <button type="button" data-disconnect hidden>Disconnect</button>
+                <button type="button" data-hide autofocus aria-label="Minimize SignalR Test Request and keep the connection">Minimize</button>
+            </div>
             <output data-status>Disconnected</output>
         </div>
-    </form>
-    <form data-command>
-        <label>Hub method
-            <input name="method" list="panixida-signalr-methods" autocomplete="off" spellcheck="false" required>
-        </label>
-        <datalist id="panixida-signalr-methods"></datalist>
-        <label>Arguments (JSON array) <textarea name="arguments" rows="2" spellcheck="false">[]</textarea></label>
-        <label data-uploads hidden>Upload streams (JSON arrays)<span></span>
-            <textarea name="uploads" rows="2" spellcheck="false"></textarea>
-        </label>
-        <div class="signalr-actions">
-            <button type="submit" value="invoke" data-primary disabled>Invoke</button>
-            <button type="submit" value="send" disabled>Send</button>
+    </header>
+    <div class="signalr-columns">
+        <div class="signalr-controls">
+            <form id="panixida-signalr-connection" class="signalr-section">
+                <h3>Authentication</h3>
+                <label>Bearer token <input name="token" type="password" autocomplete="off" spellcheck="false"></label>
+            </form>
+            <form class="signalr-section" data-command hidden>
+                <label>Hub method <select name="method"></select></label>
+                <label>Arguments (JSON array) <textarea name="arguments" rows="5" spellcheck="false"></textarea></label>
+                <label data-uploads hidden>Upload streams (JSON arrays)<span></span>
+                    <textarea name="uploads" rows="3" spellcheck="false"></textarea>
+                </label>
+                <div class="signalr-actions">
+                    <button type="submit" value="invoke" data-primary disabled>Invoke</button>
+                    <button type="submit" value="send" disabled>Send</button>
+                </div>
+            </form>
+            <section class="signalr-section" aria-labelledby="panixida-signalr-events">
+                <h3 id="panixida-signalr-events">Server events</h3>
+                <p data-no-events hidden>No server events are documented for this hub.</p>
+                <ul data-events></ul>
+            </section>
         </div>
-    </form>
-    <section aria-label="Messages">
-        <header>
-            <h3>Messages</h3>
-            <button type="button" data-clear>Clear</button>
-        </header>
-        <ol role="log" aria-label="SignalR messages"></ol>
-    </section>
+        <section class="signalr-journal" aria-labelledby="panixida-signalr-messages">
+            <header>
+                <h3 id="panixida-signalr-messages">Messages</h3>
+                <button type="button" data-clear>Clear</button>
+            </header>
+            <div class="signalr-log" role="log" aria-label="SignalR messages">
+                <p data-empty></p>
+                <ol></ol>
+            </div>
+        </section>
+    </div>
 </dialog>
