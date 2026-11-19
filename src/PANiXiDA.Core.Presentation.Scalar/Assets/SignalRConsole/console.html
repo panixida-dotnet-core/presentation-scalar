@@ -1,14 +1,14 @@
 <dialog aria-labelledby="panixida-signalr-title">
     <header class="signalr-header">
         <div class="signalr-endpoint">
-            <h2 id="panixida-signalr-title" tabindex="-1" autofocus></h2>
+            <h2 id="panixida-signalr-title">SignalR Test Request</h2>
             <code data-address></code>
         </div>
         <div class="signalr-connection">
             <div class="signalr-actions">
                 <button type="submit" form="panixida-signalr-connection" data-connect data-primary>Connect</button>
                 <button type="button" data-disconnect hidden>Disconnect</button>
-                <button type="button" data-hide aria-label="Minimize SignalR Test Request and keep the connection">Minimize</button>
+                <button type="button" data-hide autofocus aria-label="Minimize SignalR Test Request and keep the connection">Minimize</button>
             </div>
             <output data-status>Disconnected</output>
         </div>
@@ -41,7 +41,7 @@
                 <h3 id="panixida-signalr-messages">Messages</h3>
                 <button type="button" data-clear>Clear</button>
             </header>
-            <div class="signalr-log" tabindex="0" role="log" aria-label="SignalR messages">
+            <div class="signalr-log" role="log" aria-label="SignalR messages">
                 <p data-empty></p>
                 <ol></ol>
             </div>

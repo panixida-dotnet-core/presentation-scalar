@@ -48,6 +48,33 @@ function sameOriginUrl(path, pathBase) {
     return url.origin === location.origin && !url.search && !url.hash ? url : null;
 }
 
+function createEntry({ kind, target, time, payload }) {
+    const item = document.createElement('li');
+    item.dataset.kind = kind;
+    const heading = document.createElement('div');
+    const timestamp = document.createElement('time');
+    timestamp.dateTime = time.toISOString();
+    timestamp.textContent = time.toLocaleTimeString();
+    const label = document.createElement('span');
+    label.textContent = kind;
+    const name = document.createElement('code');
+    name.textContent = target;
+    heading.append(timestamp, label, name);
+    item.append(heading);
+    if (payload !== undefined) {
+        const body = document.createElement('pre');
+        body.textContent = payload;
+        item.append(body);
+    }
+    return item;
+}
+
+function selectMethod(session, method) {
+    session.method = method;
+    session.arguments = JSON.stringify(method.arguments(), null, 2);
+    session.uploads = JSON.stringify(method.inputStreams.map(() => []), null, 2);
+}
+
 function mountConsole(root, requests) {
     const dialog = root.querySelector('dialog');
     const title = root.querySelector('h2');
@@ -60,9 +87,9 @@ function mountConsole(root, requests) {
     const uploadsInput = commandForm.elements.uploads;
     const uploadsField = root.querySelector('[data-uploads]');
     const events = root.querySelector('[data-events]');
-    const log = root.querySelector('[role="log"]');
-    const messages = log.querySelector('ol');
-    const emptyLog = log.querySelector('[data-empty]');
+    const journal = root.querySelector('.signalr-journal');
+    const messages = journal.querySelector('ol');
+    const emptyLog = journal.querySelector('[data-empty]');
     const statusOutput = root.querySelector('[data-status]');
     const disconnect = root.querySelector('[data-disconnect]');
     const connect = root.querySelector('[data-connect]');
@@ -71,27 +98,6 @@ function mountConsole(root, requests) {
     const sessions = new Map();
     let current;
     let opener;
-
-    function createEntry({ kind, target, time, payload }) {
-        const item = document.createElement('li');
-        item.dataset.kind = kind;
-        const heading = document.createElement('div');
-        const timestamp = document.createElement('time');
-        timestamp.dateTime = time.toISOString();
-        timestamp.textContent = time.toLocaleTimeString();
-        const label = document.createElement('span');
-        label.textContent = kind;
-        const name = document.createElement('code');
-        name.textContent = target;
-        heading.append(timestamp, label, name);
-        item.append(heading);
-        if (payload !== undefined) {
-            const body = document.createElement('pre');
-            body.textContent = payload;
-            item.append(body);
-        }
-        return item;
-    }
 
     function write(session, kind, target, value, token = '') {
         const entry = {
@@ -107,14 +113,14 @@ function mountConsole(root, requests) {
         }
 
         if (current === session && dialog.open) {
-            const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight <= 12;
+            const atBottom = journal.scrollHeight - journal.scrollTop - journal.clientHeight <= 12;
             emptyLog.hidden = true;
             messages.append(createEntry(entry));
             if (trim) {
                 messages.firstElementChild.remove();
             }
             if (atBottom) {
-                log.scrollTop = log.scrollHeight;
+                journal.scrollTop = journal.scrollHeight;
             }
         }
     }
@@ -138,12 +144,6 @@ function mountConsole(root, requests) {
         send.disabled = !ready || !session.method || session.method.streamResult;
         emptyLog.textContent = ready ? 'Waiting for messages from the hub.' : 'Connect to receive messages.';
         emptyLog.hidden = session.entries.length > 0;
-    }
-
-    function selectMethod(session, method) {
-        session.method = method;
-        session.arguments = JSON.stringify(method.arguments(), null, 2);
-        session.uploads = JSON.stringify(method.inputStreams.map(() => []), null, 2);
     }
 
     function renderMethod(session) {
@@ -194,13 +194,13 @@ function mountConsole(root, requests) {
         if (!dialog.open) {
             dialog.showModal();
         }
-        log.scrollTop = log.scrollHeight;
+        journal.scrollTop = journal.scrollHeight;
     }
 
     async function start(event) {
         event.preventDefault();
         const session = current;
-        if (!session || session.status !== disconnected) {
+        if (session?.status !== disconnected) {
             return;
         }
 
@@ -285,10 +285,11 @@ function mountConsole(root, requests) {
             const args = readArray(session.arguments, 'Arguments');
             const uploads = createUploads(window.signalR, session.uploads, method.inputStreams);
             const parameters = args.concat(uploads.map(upload => upload.subject));
-            const mode = event.submitter?.value ?? 'invoke';
+            const sendOnly = event.submitter?.value === 'send';
+            const command = sendOnly ? 'Send' : 'Invoke';
             const connection = session.connection;
 
-            write(session, method.streamResult ? 'Stream' : mode === 'send' ? 'Send' : 'Invoke', target, args, token);
+            write(session, method.streamResult ? 'Stream' : command, target, args, token);
             if (method.streamResult) {
                 connection.stream(target, ...parameters).subscribe({
                     next: item => write(session, 'Stream item', target, item, token),
@@ -297,12 +298,12 @@ function mountConsole(root, requests) {
                 });
                 publishUploads(uploads);
             } else {
-                const pending = mode === 'send'
+                const pending = sendOnly
                     ? connection.send(target, ...parameters)
                     : connection.invoke(target, ...parameters);
                 publishUploads(uploads);
                 const result = await pending;
-                write(session, mode === 'send' ? 'Sent' : 'Reply', target, result, token);
+                write(session, sendOnly ? 'Sent' : 'Reply', target, result, token);
             }
         } catch (error) {
             fail(error);

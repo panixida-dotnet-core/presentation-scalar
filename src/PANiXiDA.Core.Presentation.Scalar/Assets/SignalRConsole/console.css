@@ -195,12 +195,15 @@ html:has(#panixida-signalr-console dialog[open]) {
 }
 
 #panixida-signalr-console .signalr-journal {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 #panixida-signalr-console .signalr-journal > header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     justify-content: space-between;
     padding: 0.75rem 1.25rem;
     border-bottom: 1px solid var(--console-border);
@@ -208,12 +211,10 @@ html:has(#panixida-signalr-console dialog[open]) {
 }
 
 #panixida-signalr-console .signalr-log {
-    overflow: auto;
-    overscroll-behavior: contain;
     padding: 0 1.25rem;
 }
 
-#panixida-signalr-console .signalr-log:focus-visible {
+#panixida-signalr-console .signalr-journal:focus-visible {
     outline-offset: -2px;
 }
 
@@ -272,9 +273,12 @@ html:has(#panixida-signalr-console dialog[open]) {
         border-right: 0;
     }
 
+    #panixida-signalr-console .signalr-journal {
+        max-height: 60dvh;
+    }
+
     #panixida-signalr-console .signalr-log {
         min-height: 14rem;
-        max-height: 55dvh;
     }
 }
 

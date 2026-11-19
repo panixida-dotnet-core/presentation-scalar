@@ -37,7 +37,6 @@ internal static partial class SignalRConsoleConfiguration
     internal static void ConfigureSignalRConsole(this ScalarOptions options, PathString pathBase,
         IEnumerable<ApiDocumentDescriptor> documents)
     {
-        // OpenAPI titles also participate in Scalar's document slug generation.
         var sources = documents
             .Select(document => new ConsoleDocument(document.Title,
                 document.Format == ApiDocumentFormat.AsyncApi ? document.Path : null))

@@ -37,6 +37,7 @@ public sealed class SignalRConsoleConfigurationTests
         page.ShouldContain("{&quot;title&quot;:&quot;Events&quot;,&quot;path&quot;:&quot;/asyncapi/events-v1.json&quot;}");
         page.ShouldContain("&quot;path&quot;:null");
         page.ShouldContain("<dialog aria-labelledby=\"panixida-signalr-title\"");
+        page.ShouldContain("<h2 id=\"panixida-signalr-title\">SignalR Test Request</h2>");
         page.ShouldNotContain("data-open");
         page.ShouldNotContain("name=\"hub\"");
         script.StatusCode.ShouldBe(HttpStatusCode.OK);
