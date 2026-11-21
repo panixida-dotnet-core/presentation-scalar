@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { addDocumentRequests, getDocumentPaths } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/requests.js';
+import { addDocumentRequests, addTestRequests, getDocumentPaths } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/requests.js';
 
 test('Scalar document IDs follow configured source titles, including HTTP sources', () => {
     const documents = [
@@ -100,4 +100,43 @@ test('SignalR uses a versioned document slug and the published channel title', (
     assert.equal(request.hub.title, 'Matchmaking');
     assert.equal(request.hub.url.href, 'https://example.com' + address);
     assert.equal(request.method.target, 'ReadState');
+});
+
+test('The introduction auth card is marked for hiding only on SignalR documents, including after switching documents', t => {
+    const introduction = {
+        id: 'matchmaking-signalr-v1/description/introduction',
+        toggleAttribute: t.mock.fn()
+    };
+    const reference = {
+        querySelectorAll: selector => selector === '.introduction-section[id]' ? [introduction] : [],
+        addEventListener() {}
+    };
+    let onMutation;
+    globalThis.document = { getElementById: () => reference };
+    globalThis.requestAnimationFrame = render => render();
+    globalThis.MutationObserver = class {
+        constructor(callback) { onMutation = callback; }
+        observe() {}
+    };
+    t.after(() => {
+        delete globalThis.document;
+        delete globalThis.requestAnimationFrame;
+        delete globalThis.MutationObserver;
+    });
+    const requests = new Map([['matchmaking-signalr-v1/channel/state', {}]]);
+
+    addTestRequests(requests, () => {});
+    assert.deepEqual(introduction.toggleAttribute.mock.calls.at(-1).arguments, ['data-panixida-signalr-intro', true]);
+
+    introduction.id = 'matchmaking-api-v1/description/introduction';
+    onMutation();
+    assert.deepEqual(introduction.toggleAttribute.mock.calls.at(-1).arguments, ['data-panixida-signalr-intro', false]);
+
+    introduction.id = 'matchmaking-kafka-v1/description/introduction';
+    onMutation();
+    assert.deepEqual(introduction.toggleAttribute.mock.calls.at(-1).arguments, ['data-panixida-signalr-intro', false]);
+
+    introduction.id = 'matchmaking-signalr-v1/description/introduction';
+    onMutation();
+    assert.deepEqual(introduction.toggleAttribute.mock.calls.at(-1).arguments, ['data-panixida-signalr-intro', true]);
 });

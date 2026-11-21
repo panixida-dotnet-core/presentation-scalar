@@ -121,8 +121,13 @@ export function addTestRequests(requests, openRequest) {
 
     const reference = document.getElementById('app') ?? document.body;
     const actions = new Map();
+    const introductionIds = new Set([...requests.keys()].map(key => key.split('/', 1)[0] + '/description/introduction'));
 
-    function addButtons() {
+    function updateReference() {
+        for (const introduction of reference.querySelectorAll('.introduction-section[id]')) {
+            introduction.toggleAttribute('data-panixida-signalr-intro', introductionIds.has(introduction.id));
+        }
+
         const renderedHeaders = new Set(reference.querySelectorAll(headerSelector));
         for (const [header, action] of actions) {
             if (!renderedHeaders.has(header) || action.button.parentElement !== header.lastElementChild
@@ -163,12 +168,12 @@ export function addTestRequests(requests, openRequest) {
             scheduled = true;
             requestAnimationFrame(() => {
                 scheduled = false;
-                addButtons();
+                updateReference();
             });
         }
     });
     observer.observe(reference, { childList: true, subtree: true, attributes: true, attributeFilter: ['id', 'class'] });
-    addButtons();
+    updateReference();
 }
 
 function getRequestArguments(document, operation) {

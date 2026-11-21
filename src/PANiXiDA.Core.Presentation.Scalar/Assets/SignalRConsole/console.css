@@ -1,3 +1,7 @@
+.introduction-section[data-panixida-signalr-intro] .scalar-reference-intro-auth {
+    display: none;
+}
+
 #panixida-signalr-console {
     --console-background: var(--scalar-background-1, light-dark(#fff, #171717));
     --console-surface: var(--scalar-background-2, light-dark(#f6f6f6, #222));
