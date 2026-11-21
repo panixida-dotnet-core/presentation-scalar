@@ -29,7 +29,15 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
+            - uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: 10.0.x
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: 17
             - run: node --test tests/signalr-console.*.test.mjs
+            - run: node tests/signalr-console.snippets.compile.mjs
 
     sonar:
         needs: [ tests, signalr-tests ]

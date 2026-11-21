@@ -173,7 +173,7 @@ function java(context) {
     const transport = supported.length > 1 ? 'ALL' : names[supported[0]];
     return [...javaConnection(context.options, transport), ...javaCallbacks(context.events),
         '', '        connection.start().blockingAwait();', ...javaInvocation(context),
-        '', '        Runtime.getRuntime().addShutdownHook(new Thread(() => connection.stop().blockingAwait()));',
+        '', '        Runtime.getRuntime().addShutdownHook(new Thread(() -> connection.stop().blockingAwait()));',
         '        new CountDownLatch(1).await();', '    }', '}'].join('\n');
 }
 
