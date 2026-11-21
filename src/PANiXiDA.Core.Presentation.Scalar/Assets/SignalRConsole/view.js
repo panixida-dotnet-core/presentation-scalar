@@ -299,7 +299,27 @@ export function renderEvents(root, hub) {
     root.querySelector('[data-no-events]').hidden = hub.events.size > 0;
 }
 
-export function mountSnippet(root, getSession) {
+export function mountCopyFeedback(dialog) {
+    const status = dialog.querySelector('[data-copy-feedback]');
+    let timeout;
+
+    function clear() {
+        clearTimeout(timeout);
+        status.textContent = '';
+    }
+
+    dialog.addEventListener('close', clear);
+    return function show(message = 'Copied to the clipboard') {
+        if (!dialog.open) {
+            return;
+        }
+        clear();
+        status.textContent = message;
+        timeout = setTimeout(clear, 3000);
+    };
+}
+
+export function mountSnippet(root, getSession, showCopyFeedback) {
     const button = root.querySelector('[data-client]');
     const menu = root.querySelector('[data-client-menu]');
     const search = root.querySelector('[data-client-search]');
@@ -322,7 +342,6 @@ export function mountSnippet(root, getSession) {
                 token.kind ? 'signalr-code-' + token.kind : undefined)));
             error.hidden = true;
             copy.disabled = false;
-            copy.textContent = 'Copy code';
         } catch (error_) {
             source = '';
             code.replaceChildren();
@@ -383,7 +402,7 @@ export function mountSnippet(root, getSession) {
     copy.addEventListener('click', async () => {
         try {
             await navigator.clipboard.writeText(source);
-            copy.textContent = 'Copied';
+            showCopyFeedback();
         } catch {
             error.textContent = 'Clipboard access was denied. Select the code to copy it.';
             error.hidden = false;

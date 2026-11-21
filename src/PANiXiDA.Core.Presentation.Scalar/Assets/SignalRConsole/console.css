@@ -52,6 +52,25 @@ html:has(#panixida-signalr-console dialog[open]) {
     background: #0007;
 }
 
+#panixida-signalr-console .signalr-copy-feedback {
+    position: fixed;
+    inset: auto 1rem 1rem auto;
+    z-index: 1;
+    pointer-events: none;
+}
+
+#panixida-signalr-console .signalr-copy-feedback:not(:empty) {
+    box-sizing: border-box;
+    width: min(22rem, calc(100% - 2rem));
+    padding: 18px;
+    border: 1px solid var(--console-border);
+    border-radius: var(--scalar-radius-lg, 8px);
+    background: var(--console-background);
+    box-shadow: var(--scalar-shadow-2, 0 8px 32px #0005);
+    font-size: var(--scalar-font-size-3, 0.875rem);
+    font-weight: var(--scalar-font-medium, 500);
+}
+
 #panixida-signalr-console :is(.signalr-actions, .signalr-journal > header) {
     display: flex;
     flex-wrap: wrap;

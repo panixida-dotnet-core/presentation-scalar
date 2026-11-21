@@ -1,6 +1,6 @@
 import { addDocumentRequests, addTestRequests, getDocumentPaths } from './requests.js';
 import { connectionAddress, connectionPath, createSettings, negotiationDetails, prepareConnection, redact } from './connection.js';
-import { mountConnectionControls, mountSnippet, renderEvents } from './view.js';
+import { mountConnectionControls, mountCopyFeedback, mountSnippet, renderEvents } from './view.js';
 
 const connected = 'Connected';
 const disconnected = 'Disconnected';
@@ -106,7 +106,8 @@ function mountConsole(root, requests) {
         updateStatus(current);
         snippet.render();
     });
-    const snippet = mountSnippet(root, () => current);
+    const showCopyFeedback = mountCopyFeedback(dialog);
+    const snippet = mountSnippet(root, () => current, showCopyFeedback);
 
     function renderAddress(session) {
         origin.textContent = session.hub.url.origin;
@@ -115,7 +116,6 @@ function mountConsole(root, requests) {
         } catch {
             address.textContent = session.hub.url.pathname.replaceAll('%7B', '{').replaceAll('%7D', '}');
         }
-        copyAddress.title = 'Copy hub URL';
     }
 
     function write(session, kind, target, value, secrets = session.secrets ?? []) {
@@ -356,9 +356,9 @@ function mountConsole(root, requests) {
         try {
             const url = connectionAddress(current.hub, current.settings);
             await navigator.clipboard.writeText(url.href);
-            copyAddress.title = 'Copied';
+            showCopyFeedback();
         } catch (error) {
-            copyAddress.title = error.message;
+            showCopyFeedback(error.message);
         }
     });
     dialog.addEventListener('close', () => {
