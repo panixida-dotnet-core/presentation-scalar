@@ -169,7 +169,7 @@ function mountConsole(root, requests) {
         const method = session.method;
         const inputs = method?.inputStreams ?? [];
         const { hub } = session;
-        title.textContent = method?.title ?? (hub.title === hub.address ? 'SignalR Test Request' : hub.title);
+        title.textContent = method?.title ?? hub.title;
         if (method) {
             methodSelect.value = method.target.toLowerCase();
             argumentsInput.value = session.arguments;

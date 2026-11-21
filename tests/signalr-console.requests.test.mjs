@@ -83,3 +83,20 @@ test('Each SignalR channel exposes its own callable methods and observed events'
     assert.deepEqual(requests.get('first/channel/unsupported').hub.transports, ['ServerSentEvents']);
     assert.notEqual(chat, requests.get('second/channel/chatv1').hub);
 });
+
+test('SignalR uses a versioned document slug and the published channel title', () => {
+    const [source] = getDocumentPaths([
+        { title: 'Matchmaking API v1', path: null },
+        { title: 'Matchmaking SignalR v1', path: '/matchmaking-signalr-v1.json' }
+    ]);
+    const address = '/api/v1/match-searches/state';
+    const requests = new Map();
+    addDocumentRequests(requests, source[0], {
+        channels: { [address]: { address, title: 'Matchmaking SignalR' } },
+        operations: { 'read-state': operation('~1api~1v1~1match-searches~1state', 'receive', 'ReadState') }
+    }, path => new URL(path, 'https://example.com'));
+
+    const request = requests.get('matchmaking-signalr-v1/channel/apiv1match-searchesstate/operation/read-state');
+    assert.equal(request.hub.title, 'Matchmaking SignalR');
+    assert.equal(request.method.target, 'ReadState');
+});
