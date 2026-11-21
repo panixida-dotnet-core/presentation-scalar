@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import test from 'node:test';
 
 import { createSettings, getAuthenticationOptions } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/connection.js';
 import { generateSnippet } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/snippets.js';
@@ -63,32 +64,34 @@ function example(target, security, transport = 'Auto') {
         arguments: arguments_, uploads: target === 'Upload' ? '[[1,2],[3,4]]' : '[]' };
 }
 
-try {
-    const project = join(dotnetDirectory, 'Snippet.csproj');
-    writeFileSync(project, `<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable></PropertyGroup>
-  <ItemGroup><PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.14" /></ItemGroup>
-</Project>\n`);
-    await downloadJavaDependencies();
-    run('dotnet', ['restore', project]);
-    const compiler = process.platform === 'win32' ? 'javac.exe' : 'javac';
-    const javac = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin', compiler) : compiler;
-    const examples = [
-        example('Echo', { type: 'http', scheme: 'bearer' }),
-        example('Publish', null, 'WebSockets'),
-        example('Count', null, 'LongPolling'),
-        example('Upload', null),
-        example('Echo', { type: 'http', scheme: 'basic' }, 'LongPolling'),
-        example('Echo', { type: 'httpApiKey', in: 'cookie', name: 'session' })
-    ];
-    for (const [index, value] of examples.entries()) {
-        writeFileSync(join(dotnetDirectory, 'Program.cs'), generateSnippet('csharp', value));
-        run('dotnet', ['build', project, '--no-restore', '--configuration', 'Release']);
-        const java = join(javaDirectory, 'SignalRExample.java');
-        writeFileSync(java, generateSnippet('java', value));
-        run(javac, ['-cp', join(jars, '*'), '-d', javaDirectory, java]);
-        process.stdout.write(`Compiled C# and Java example ${index + 1}: ${value.method.target}\n`);
+test('Generated C# and Java examples compile against their SignalR SDKs', async () => {
+    try {
+        const project = join(dotnetDirectory, 'Snippet.csproj');
+        writeFileSync(project, `<Project Sdk="Microsoft.NET.Sdk">
+      <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable></PropertyGroup>
+      <ItemGroup><PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.14" /></ItemGroup>
+    </Project>\n`);
+        await downloadJavaDependencies();
+        run('dotnet', ['restore', project]);
+        const compiler = process.platform === 'win32' ? 'javac.exe' : 'javac';
+        const javac = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin', compiler) : compiler;
+        const examples = [
+            example('Echo', { type: 'http', scheme: 'bearer' }),
+            example('Publish', null, 'WebSockets'),
+            example('Count', null, 'LongPolling'),
+            example('Upload', null),
+            example('Echo', { type: 'http', scheme: 'basic' }, 'LongPolling'),
+            example('Echo', { type: 'httpApiKey', in: 'cookie', name: 'session' })
+        ];
+        for (const [index, value] of examples.entries()) {
+            writeFileSync(join(dotnetDirectory, 'Program.cs'), generateSnippet('csharp', value));
+            run('dotnet', ['build', project, '--no-restore', '--configuration', 'Release']);
+            const java = join(javaDirectory, 'SignalRExample.java');
+            writeFileSync(java, generateSnippet('java', value));
+            run(javac, ['-cp', join(jars, '*'), '-d', javaDirectory, java]);
+            process.stdout.write(`Compiled C# and Java example ${index + 1}: ${value.method.target}\n`);
+        }
+    } finally {
+        rmSync(workspace, { recursive: true, force: true });
     }
-} finally {
-    rmSync(workspace, { recursive: true, force: true });
-}
+});

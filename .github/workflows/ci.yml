@@ -36,8 +36,8 @@ jobs:
               with:
                   distribution: temurin
                   java-version: 17
-            - run: node --test tests/signalr-console.*.test.mjs
-            - run: node tests/signalr-console.snippets.compile.mjs
+            - run: node --test tests/signalr-console.requests.test.mjs tests/signalr-console.behavior.test.mjs
+            - run: node --test tests/signalr-console.snippets.test.mjs
 
     sonar:
         needs: [ tests, signalr-tests ]
