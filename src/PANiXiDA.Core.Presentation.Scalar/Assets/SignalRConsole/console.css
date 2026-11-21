@@ -66,6 +66,7 @@ html:has(#panixida-signalr-console dialog[open]) {
     border: 1px solid var(--console-border);
     border-radius: var(--scalar-radius-lg, 8px);
     background: var(--console-background);
+    color: var(--console-text);
     box-shadow: var(--scalar-shadow-2, 0 8px 32px #0005);
     font-size: var(--scalar-font-size-3, 0.875rem);
     font-weight: var(--scalar-font-medium, 500);
