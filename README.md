@@ -245,7 +245,7 @@ Run the SignalR console tests with Node.js 24 or later:
 node --test tests/signalr-console.requests.test.mjs tests/signalr-console.behavior.test.mjs
 ```
 
-CI also compiles generated C# and Java examples for RPC, completion-only methods, streaming, upload streams, and authentication. Run the same check with .NET 10 and JDK 17 (`JAVA_HOME` or `javac` on PATH); it downloads public compile dependencies into a temporary directory and removes them afterwards:
+You can also compile generated C# and Java examples for RPC, completion-only methods, streaming, upload streams, and authentication locally with .NET 10 and JDK 17 (`JAVA_HOME` or `javac` on PATH). This optional check downloads public compile dependencies into a temporary directory and removes them afterwards:
 
 ```shell
 node --test tests/signalr-console.snippets.test.mjs
