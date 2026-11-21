@@ -8,7 +8,7 @@
             <div class="signalr-actions">
                 <button type="submit" form="panixida-signalr-connection" data-connect data-primary>Connect</button>
                 <button type="button" data-disconnect hidden>Disconnect</button>
-                <button type="button" data-hide autofocus aria-label="Close SignalR Test Request" title="Close the window and keep the connection. Use Disconnect to end it.">Close ✕</button>
+                <button type="button" data-hide autofocus aria-label="Close SignalR Test Request" title="Close the window and keep the connection. Use Disconnect to end it.">Close</button>
             </div>
             <output data-status>Disconnected</output>
         </div>
@@ -63,15 +63,15 @@
             <details class="signalr-snippet" data-snippet>
                 <summary>Code Snippet</summary>
                 <div class="signalr-snippet-toolbar">
-                    <button type="button" data-client aria-haspopup="listbox" aria-expanded="false">JavaScript / @microsoft/signalr</button>
+                    <button type="button" data-client aria-controls="panixida-signalr-clients" aria-expanded="false">JavaScript / @microsoft/signalr</button>
                     <label data-snippet-action-label>Call type <select data-snippet-action aria-label="Snippet call type">
                         <option value="invoke">Invoke</option><option value="send">Send</option>
                     </select></label>
                     <button type="button" data-copy>Copy code</button>
                 </div>
                 <p class="signalr-help">Authentication secrets are placeholders. Browser cookies must be supplied separately in native clients.</p>
-                <p class="signalr-help" data-snippet-error role="status" hidden></p>
-                <pre tabindex="0" aria-label="SignalR code snippet"><code data-code></code></pre>
+                <output class="signalr-help" data-snippet-error hidden></output>
+                <pre aria-label="SignalR code snippet"><code data-code></code></pre>
             </details>
         </div>
         <section class="signalr-journal" aria-labelledby="panixida-signalr-messages">
@@ -85,9 +85,9 @@
             </div>
         </section>
     </div>
-    <div class="signalr-client-menu" data-client-menu popover>
+    <div class="signalr-client-menu" id="panixida-signalr-clients" data-client-menu popover>
         <label>Search clients <input type="search" data-client-search autocomplete="off"></label>
-        <div role="listbox" aria-label="SignalR clients" data-client-options></div>
+        <section aria-label="SignalR clients" data-client-options></section>
         <p data-no-clients hidden>No matching clients.</p>
     </div>
 </dialog>

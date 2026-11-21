@@ -12,7 +12,7 @@ const quote = value => JSON.stringify(value);
 function readArguments(value, label) {
     const result = JSON.parse(value);
     if (!Array.isArray(result)) {
-        throw new Error(`${label} must be a JSON array.`);
+        throw new TypeError(`${label} must be a JSON array.`);
     }
     return result;
 }
@@ -45,8 +45,12 @@ function requireArgumentCounts(events) {
     }
 }
 
-function javascript({ session, options, args, uploads, events }, typed) {
-    const { method } = session;
+function javascript(context, typed) {
+    return [...javascriptConnection(context, typed), ...javascriptInvocation(context, typed),
+        '', '// Keep the connection open to receive events; call connection.stop() when finished.'].join('\n');
+}
+
+function javascriptConnection({ options, uploads, events }, typed) {
     const imports = ['HubConnectionBuilder', 'HttpTransportType', ...(uploads.length ? ['Subject'] : [])];
     const lines = [
         '// npm install @microsoft/signalr',
@@ -71,30 +75,36 @@ function javascript({ session, options, args, uploads, events }, typed) {
             `    console.log(${quote(event.target)}, ...args);`, '});');
     }
     lines.push('', 'await connection.start();');
-    if (method) {
-        lines.push('');
-        for (const [index] of uploads.entries()) {
-            lines.push(`const upload${index + 1} = new Subject${typed ? '<unknown>' : ''}();`);
-        }
-        const parameters = [...args.map(value => JSON.stringify(value)), ...uploads.map((_, index) => `upload${index + 1}`)];
-        const call = [quote(method.target), ...parameters].join(', ');
-        if (method.streamResult) {
-            lines.push(`connection.stream${typed ? '<unknown>' : ''}(${call}).subscribe({`,
-                '    next: item => console.log(item),', '    error: error => console.error(error),',
-                "    complete: () => console.log('Stream completed')", '});');
-        } else {
-            lines.push(`const pending = connection.${session.action === 'send' ? 'send' : 'invoke'}(${call});`);
-        }
-        for (const [index, items] of uploads.entries()) {
-            lines.push(`for (const item of ${JSON.stringify(items)}) {`, `    upload${index + 1}.next(item);`, '}',
-                `upload${index + 1}.complete();`);
-        }
-        if (!method.streamResult) {
-            lines.push('console.log(await pending);');
-        }
+    return lines;
+}
+
+function javascriptInvocation({ session, args, uploads }, typed) {
+    const { method } = session;
+    if (!method) {
+        return [];
     }
-    lines.push('', "// Keep the connection open to receive events; call connection.stop() when finished.");
-    return lines.join('\n');
+    const lines = [];
+    lines.push('');
+    for (const [index] of uploads.entries()) {
+        lines.push(`const upload${index + 1} = new Subject${typed ? '<unknown>' : ''}();`);
+    }
+    const parameters = [...args.map(value => JSON.stringify(value)), ...uploads.map((_, index) => `upload${index + 1}`)];
+    const call = [quote(method.target), ...parameters].join(', ');
+    if (method.streamResult) {
+        lines.push(`connection.stream${typed ? '<unknown>' : ''}(${call}).subscribe({`,
+            '    next: item => console.log(item),', '    error: error => console.error(error),',
+            "    complete: () => console.log('Stream completed')", '});');
+    } else {
+        lines.push(`const pending = connection.${session.action === 'send' ? 'send' : 'invoke'}(${call});`);
+    }
+    for (const [index, items] of uploads.entries()) {
+        lines.push(`for (const item of ${JSON.stringify(items)}) {`, `    upload${index + 1}.next(item);`, '}',
+            `upload${index + 1}.complete();`);
+    }
+    if (!method.streamResult) {
+        lines.push('console.log(await pending);');
+    }
+    return lines;
 }
 
 function csharp({ session, options, args, uploads, events }) {
@@ -151,16 +161,23 @@ function csharp({ session, options, args, uploads, events }) {
     return lines.join('\n');
 }
 
-function java({ session, options, args, uploads, events }) {
-    const { method } = session;
-    const supported = options.transports.filter(value => value !== 'ServerSentEvents');
+function java(context) {
+    const supported = context.options.transports.filter(value => value !== 'ServerSentEvents');
     if (supported.length === 0) {
         throw new Error('The Microsoft Java SignalR client does not support ServerSentEvents.');
     }
-    if (events.some(event => event.argumentCount > 8)) {
+    if (context.events.some(event => event.argumentCount > 8)) {
         throw new Error('The Microsoft Java client supports callbacks with up to eight arguments.');
     }
-    const transport = supported.length === 2 ? 'ALL' : supported[0] === 'WebSockets' ? 'WEBSOCKETS' : 'LONG_POLLING';
+    const names = { WebSockets: 'WEBSOCKETS', LongPolling: 'LONG_POLLING' };
+    const transport = supported.length > 1 ? 'ALL' : names[supported[0]];
+    return [...javaConnection(context.options, transport), ...javaCallbacks(context.events),
+        '', '        connection.start().blockingAwait();', ...javaInvocation(context),
+        '', '        Runtime.getRuntime().addShutdownHook(new Thread(() => connection.stop().blockingAwait()));',
+        '        new CountDownLatch(1).await();', '    }', '}'].join('\n');
+}
+
+function javaConnection(options, transport) {
     const lines = ['// Dependency: com.microsoft.signalr:signalr (10.x)',
         'import com.microsoft.signalr.HubConnection;', 'import com.microsoft.signalr.HubConnectionBuilder;',
         'import com.microsoft.signalr.TransportEnum;', 'import com.google.gson.JsonElement;',
@@ -180,6 +197,11 @@ function java({ session, options, args, uploads, events }) {
             '            .withHeader("Cookie", "YOUR_COOKIE_NAME=YOUR_COOKIE_VALUE")');
     }
     lines.push('            .build();', '');
+    return lines;
+}
+
+function javaCallbacks(events) {
+    const lines = [];
     for (const event of events) {
         const parameters = Array.from({ length: event.argumentCount }, (_, index) => 'JsonElement value' + (index + 1));
         const values = parameters.map((_, index) => 'value' + (index + 1));
@@ -188,43 +210,61 @@ function java({ session, options, args, uploads, events }) {
             `            System.out.println(${quote(event.target)}${values.length ? ' + ": " + java.util.Arrays.toString(new Object[] { ' + values.join(', ') + ' })' : ''});`,
             `        }${types.length ? ', ' + types.join(', ') : ''});`);
     }
-    lines.push('', '        connection.start().blockingAwait();');
-    if (method) {
-        for (const [index, items] of uploads.entries()) {
-            lines.push(`        ReplaySubject<JsonElement> upload${index + 1} = ReplaySubject.create();`);
-            for (const item of items) {
-                lines.push(`        upload${index + 1}.onNext(JsonParser.parseString(${quote(JSON.stringify(item))}));`);
-            }
-            lines.push(`        upload${index + 1}.onComplete();`);
-        }
-        const parameters = [...args.map(value => `JsonParser.parseString(${quote(JSON.stringify(value))})`),
-            ...uploads.map((_, index) => `upload${index + 1}`)];
-        const call = [quote(method.target), ...parameters].join(', ');
-        if (method.streamResult) {
-            lines.push(`        connection.stream(JsonElement.class, ${call}).blockingForEach(System.out::println);`);
-        } else if (session.action === 'send') {
-            lines.push(`        connection.send(${call});`);
-        } else if (method.returnsValue === true) {
-            lines.push(`        JsonElement reply = connection.invoke(JsonElement.class, ${call}).blockingGet();`,
-                '        System.out.println(reply);');
-        } else {
-            lines.push(`        connection.invoke(${call}).blockingAwait();`);
-        }
+    return lines;
+}
+
+function javaInvocation({ session, args, uploads }) {
+    const { method } = session;
+    if (!method) {
+        return [];
     }
-    lines.push('', '        Runtime.getRuntime().addShutdownHook(new Thread(() -> connection.stop().blockingAwait()));',
-        '        new CountDownLatch(1).await();', '    }', '}');
-    return lines.join('\n');
+    const lines = [];
+    for (const [index, items] of uploads.entries()) {
+        lines.push(`        ReplaySubject<JsonElement> upload${index + 1} = ReplaySubject.create();`);
+        for (const item of items) {
+            lines.push(`        upload${index + 1}.onNext(JsonParser.parseString(${quote(JSON.stringify(item))}));`);
+        }
+        lines.push(`        upload${index + 1}.onComplete();`);
+    }
+    const parameters = [...args.map(value => `JsonParser.parseString(${quote(JSON.stringify(value))})`),
+        ...uploads.map((_, index) => `upload${index + 1}`)];
+    const call = [quote(method.target), ...parameters].join(', ');
+    if (method.streamResult) {
+        lines.push(`        connection.stream(JsonElement.class, ${call}).blockingForEach(System.out::println);`);
+    } else if (session.action === 'send') {
+        lines.push(`        connection.send(${call});`);
+    } else if (method.returnsValue === true) {
+        lines.push(`        JsonElement reply = connection.invoke(JsonElement.class, ${call}).blockingGet();`,
+            '        System.out.println(reply);');
+    } else {
+        lines.push(`        connection.invoke(${call}).blockingAwait();`);
+    }
+    return lines;
+}
+
+const codeKeywords = new Set('import from const let new await async using var public class static void throws for foreach in return true false null typeof'.split(' '));
+
+function codeTokenKind(text) {
+    if (text.startsWith('//')) {
+        return 'comment';
+    }
+    if (text.startsWith('"') || text.startsWith("'")) {
+        return 'string';
+    }
+    if (/^\d/u.test(text)) {
+        return 'number';
+    }
+    return codeKeywords.has(text) ? 'keyword' : undefined;
 }
 
 export function codeTokens(code) {
-    const expression = /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/[^\n]*|\b(?:import|from|const|let|new|await|async|using|var|public|class|static|void|throws|for|foreach|in|return|true|false|null|typeof)\b|\b\d+\b)/gu;
+    const expression = /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/[^\n]*|\b[A-Za-z_]\w*\b|\b\d+\b)/gu;
     const tokens = [];
     let position = 0;
     for (const match of code.matchAll(expression)) {
         tokens.push({ text: code.slice(position, match.index) });
         const text = match[0];
-        const kind = text.startsWith('//') ? 'comment' : /^['"]/u.test(text) ? 'string' : /^\d/u.test(text) ? 'number' : 'keyword';
-        tokens.push({ text, kind });
+        tokens.push({ text, kind: codeTokenKind(text) });
         position = match.index + text.length;
     }
     tokens.push({ text: code.slice(position) });

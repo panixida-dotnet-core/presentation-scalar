@@ -89,7 +89,8 @@ export function replyReturnsValue(document, operation) {
     return results.length ? results.some(Boolean) : null;
 }
 
-export function describeSchema(schema, context, name, required = false, parents = new Set(), budget = { left: 200 }) {
+export function describeSchema(schema, context, name, required = false, parents = new Set(), budget) {
+    budget ??= { left: 200 };
     if (!schema || budget.left-- <= 0 || parents.size >= 20) {
         return { name, type: 'Schema limit reached', children: [] };
     }

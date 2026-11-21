@@ -107,12 +107,15 @@ html:has(#panixida-signalr-console dialog[open]) {
 
 #panixida-signalr-console .signalr-controls {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
+    min-width: 0;
     min-height: 0;
     border-right: 1px solid var(--console-border);
 }
 
 #panixida-signalr-console .signalr-settings {
+    min-width: 0;
     overflow: auto;
     overscroll-behavior: contain;
 }
@@ -312,6 +315,7 @@ html:has(#panixida-signalr-console dialog[open]) {
 }
 
 #panixida-signalr-console .signalr-snippet {
+    min-width: 0;
     min-height: 0;
     border-top: 1px solid var(--console-border);
     background: var(--console-surface);
@@ -341,11 +345,14 @@ html:has(#panixida-signalr-console dialog[open]) {
     font-size: 0.75rem;
 }
 
-#panixida-signalr-console .signalr-snippet > p {
+#panixida-signalr-console .signalr-snippet > :is(p, output) {
+    display: block;
     padding: 0 1.25rem 0.5rem;
 }
 
 #panixida-signalr-console .signalr-snippet > pre {
+    box-sizing: border-box;
+    max-width: 100%;
     max-height: 15rem;
     overflow: auto;
     margin: 0;
@@ -390,7 +397,7 @@ html:has(#panixida-signalr-console dialog[open]) {
     overflow-wrap: anywhere;
 }
 
-#panixida-signalr-console .signalr-client-menu button[aria-selected="true"] {
+#panixida-signalr-console .signalr-client-menu button[aria-pressed="true"] {
     border-color: var(--console-accent);
 }
 

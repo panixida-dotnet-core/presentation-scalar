@@ -27,6 +27,21 @@ export function getDocumentPaths(sources) {
     return [...paths].filter(([, path]) => path !== null);
 }
 
+function updateHub(hub, binding, document, operation, channel) {
+    hub.transports = transportNames.filter(value => hub.transports.includes(value) || binding.transports.includes(value));
+    const authentication = getAuthenticationOptions(document, operation, channel);
+    hub.authentication.required ||= authentication.required;
+    hub.authentication.declared ||= authentication.declared;
+    hub.authentication.options = [...new Map([...hub.authentication.options, ...authentication.options]
+        .map(value => [value.id, value])).values()];
+    if (hub.authentication.declared) {
+        hub.authentication.options = hub.authentication.options.filter(value => !['bearer', 'cookie'].includes(value.id));
+    }
+    if (hub.authentication.required) {
+        hub.authentication.options.sort((left, right) => Number(left.id === 'none') - Number(right.id === 'none'));
+    }
+}
+
 export function addDocumentRequests(requests, slug, document, getUrl) {
     const channelPrefix = '#/channels/';
     const hubs = new Map();
@@ -64,18 +79,7 @@ export function addDocumentRequests(requests, slug, document, getUrl) {
             registerRequest(requests, anchor, { hub });
         }
 
-        hub.transports = transportNames.filter(value => hub.transports.includes(value) || binding.transports.includes(value));
-        const authentication = getAuthenticationOptions(document, operation, channel);
-        hub.authentication.required ||= authentication.required;
-        hub.authentication.declared ||= authentication.declared;
-        hub.authentication.options = [...new Map([...hub.authentication.options, ...authentication.options]
-            .map(value => [value.id, value])).values()];
-        if (hub.authentication.declared) {
-            hub.authentication.options = hub.authentication.options.filter(value => !['bearer', 'cookie'].includes(value.id));
-        }
-        if (hub.authentication.required) {
-            hub.authentication.options.sort((left, right) => Number(left.id === 'none') - Number(right.id === 'none'));
-        }
+        updateHub(hub, binding, document, operation, channel);
 
         const target = binding.target;
         const key = target.toLowerCase();

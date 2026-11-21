@@ -10,6 +10,56 @@ function textElement(tag, text, className) {
     return element;
 }
 
+function credentialInput(item, settings, name, multiple, onChange) {
+    const label = textElement('label', multiple ? item.label + ': ' + name : item.label);
+    const input = document.createElement('input');
+    input.type = name === 'username' ? 'text' : 'password';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.maxLength = 8192;
+    input.value = settings.credentials[item.id]?.[name] ?? '';
+    input.addEventListener('input', () => {
+        settings.credentials[item.id] ??= {};
+        settings.credentials[item.id][name] = input.value;
+        onChange();
+    });
+    label.append(input);
+    return label;
+}
+
+function credentialNames(kind) {
+    if (kind === 'basic') {
+        return ['username', 'password'];
+    }
+    return [kind === 'apiKey' ? 'value' : 'token'];
+}
+
+function credentialGroup(item, settings, onChange) {
+    const group = document.createElement('div');
+    group.className = 'signalr-fields';
+    if (item.description) {
+        group.append(textElement('p', item.description, 'signalr-help'));
+    }
+    if (item.kind === 'cookie') {
+        const suffix = item.name ? ' (' + item.name + ')' : '';
+        group.append(textElement('p', 'Uses browser cookies for this API' + suffix + '. Cookies are sent according to browser domain and SameSite rules.', 'signalr-help'));
+        return group;
+    }
+    if (item.kind === 'unsupported') {
+        group.append(textElement('p', 'This scheme is not supported by the browser client.', 'signalr-help'));
+        return group;
+    }
+    if (item.tokenSource) {
+        group.append(textElement('p', 'Enter an issued access token. OAuth login and token refresh are handled by your identity provider.', 'signalr-help'));
+    }
+    if (item.scopes?.length) {
+        group.append(textElement('p', 'Required scopes: ' + item.scopes.join(', '), 'signalr-help'));
+    }
+    const names = credentialNames(item.kind);
+    group.append(...names.map(name => credentialInput(item, settings, name, names.length > 1, onChange)));
+    return group;
+}
+
 export function mountConnectionControls(root, getSession, onChange) {
     const form = root.querySelector('#panixida-signalr-connection');
     const authentication = form.elements.authentication;
@@ -19,44 +69,7 @@ export function mountConnectionControls(root, getSession, onChange) {
     function renderCredentials() {
         const { hub, settings } = getSession();
         const option = hub.authentication.options.find(value => value.id === settings.authentication);
-        fields.replaceChildren();
-        for (const item of option?.credentials ?? []) {
-            const group = document.createElement('div');
-            group.className = 'signalr-fields';
-            if (item.description) {
-                group.append(textElement('p', item.description, 'signalr-help'));
-            }
-            if (item.kind === 'cookie') {
-                group.append(textElement('p', `Uses browser cookies for this API${item.name ? ' (' + item.name + ')' : ''}. Cookies are sent according to browser domain and SameSite rules.`, 'signalr-help'));
-            } else if (item.kind === 'unsupported') {
-                group.append(textElement('p', 'This scheme is not supported by the browser client.', 'signalr-help'));
-            } else {
-                if (item.tokenSource) {
-                    group.append(textElement('p', 'Enter an issued access token. OAuth login and token refresh are handled by your identity provider.', 'signalr-help'));
-                }
-                if (item.scopes?.length) {
-                    group.append(textElement('p', 'Required scopes: ' + item.scopes.join(', '), 'signalr-help'));
-                }
-                const names = item.kind === 'basic' ? ['username', 'password'] : [item.kind === 'apiKey' ? 'value' : 'token'];
-                for (const name of names) {
-                    const label = textElement('label', names.length > 1 ? `${item.label}: ${name}` : item.label);
-                    const input = document.createElement('input');
-                    input.type = name === 'username' ? 'text' : 'password';
-                    input.autocomplete = 'off';
-                    input.spellcheck = false;
-                    input.maxLength = 8192;
-                    input.value = settings.credentials[item.id]?.[name] ?? '';
-                    input.addEventListener('input', () => {
-                        settings.credentials[item.id] ??= {};
-                        settings.credentials[item.id][name] = input.value;
-                        onChange();
-                    });
-                    label.append(input);
-                    group.append(label);
-                }
-            }
-            fields.append(group);
-        }
+        fields.replaceChildren(...(option?.credentials ?? []).map(item => credentialGroup(item, settings, onChange)));
     }
 
     function renderPairs(kind) {
@@ -224,10 +237,10 @@ export function mountSnippet(root, getSession) {
             error.hidden = true;
             copy.disabled = false;
             copy.textContent = 'Copy code';
-        } catch (failure) {
+        } catch (error_) {
             source = '';
             code.replaceChildren();
-            error.textContent = failure.message;
+            error.textContent = error_.message;
             error.hidden = false;
             copy.disabled = true;
         }
@@ -239,8 +252,7 @@ export function mountSnippet(root, getSession) {
         options.replaceChildren(...filtered.map(client => {
             const option = document.createElement('button');
             option.type = 'button';
-            option.setAttribute('role', 'option');
-            option.setAttribute('aria-selected', String(client.id === (getSession().snippetClient ?? 'javascript')));
+            option.setAttribute('aria-pressed', String(client.id === (getSession().snippetClient ?? 'javascript')));
             option.append(textElement('span', client.language), textElement('small', client.library));
             option.addEventListener('click', () => {
                 getSession().snippetClient = client.id;
@@ -274,6 +286,11 @@ export function mountSnippet(root, getSession) {
             event.preventDefault();
             const step = event.key === 'ArrowDown' ? 1 : -1;
             choices[(choices.indexOf(document.activeElement) + step + choices.length) % choices.length]?.focus();
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            menu.hidePopover();
+            button.focus();
         }
     });
     action.addEventListener('change', () => { getSession().action = action.value; render(); });
