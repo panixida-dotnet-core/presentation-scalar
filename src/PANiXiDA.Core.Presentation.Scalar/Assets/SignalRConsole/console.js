@@ -1,5 +1,5 @@
 import { addDocumentRequests, addTestRequests, getDocumentPaths } from './requests.js';
-import { createSettings, negotiationDetails, prepareConnection, redact } from './connection.js';
+import { connectionAddress, connectionPath, createSettings, negotiationDetails, prepareConnection, redact } from './connection.js';
 import { mountConnectionControls, mountSnippet, renderEvents } from './view.js';
 
 const connected = 'Connected';
@@ -82,6 +82,8 @@ function mountConsole(root, requests) {
     const dialog = root.querySelector('dialog');
     const title = root.querySelector('h2');
     const address = root.querySelector('[data-address]');
+    const origin = root.querySelector('[data-origin]');
+    const copyAddress = root.querySelector('[data-copy-address]');
     const connectionForm = root.querySelector('#panixida-signalr-connection');
     const commandForm = root.querySelector('[data-command]');
     const methodSelect = commandForm.elements.method;
@@ -100,10 +102,21 @@ function mountConsole(root, requests) {
     let current;
     let opener;
     const controls = mountConnectionControls(root, () => current, () => {
+        renderAddress(current);
         updateStatus(current);
         snippet.render();
     });
     const snippet = mountSnippet(root, () => current);
+
+    function renderAddress(session) {
+        origin.textContent = session.hub.url.origin;
+        try {
+            address.textContent = connectionPath(session.hub, session.settings);
+        } catch {
+            address.textContent = session.hub.url.pathname.replaceAll('%7B', '{').replaceAll('%7D', '}');
+        }
+        copyAddress.title = 'Copy hub URL';
+    }
 
     function write(session, kind, target, value, secrets = session.secrets ?? []) {
         const entry = {
@@ -155,6 +168,8 @@ function mountConsole(root, requests) {
     function renderMethod(session) {
         const method = session.method;
         const inputs = method?.inputStreams ?? [];
+        const { hub } = session;
+        title.textContent = method?.title ?? (hub.title === hub.address ? 'SignalR Test Request' : hub.title);
         if (method) {
             methodSelect.value = method.target.toLowerCase();
             argumentsInput.value = session.arguments;
@@ -182,8 +197,7 @@ function mountConsole(root, requests) {
 
         current = session;
         opener = trigger;
-        title.textContent = hub.title;
-        address.textContent = hub.url.href;
+        renderAddress(session);
         controls.render(session);
         commandForm.hidden = hub.methods.size === 0;
         methodSelect.replaceChildren(...Array.from(hub.methods, ([key, item]) => new Option(item.title, key)));
@@ -338,7 +352,17 @@ function mountConsole(root, requests) {
     }
 
     root.querySelector('[data-hide]').addEventListener('click', () => dialog.close());
+    copyAddress.addEventListener('click', async () => {
+        try {
+            const url = connectionAddress(current.hub, current.settings);
+            await navigator.clipboard.writeText(url.href);
+            copyAddress.title = 'Copied';
+        } catch (error) {
+            copyAddress.title = error.message;
+        }
+    });
     dialog.addEventListener('close', () => {
+        controls.close();
         snippet.close();
         if (!dialog.open && opener?.isConnected) {
             opener.focus({ preventScroll: true });

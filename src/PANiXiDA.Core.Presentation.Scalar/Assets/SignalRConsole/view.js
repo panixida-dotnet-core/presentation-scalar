@@ -10,13 +10,16 @@ function textElement(tag, text, className) {
     return element;
 }
 
-function credentialInput(item, settings, name, multiple, onChange) {
-    const label = textElement('label', multiple ? item.label + ': ' + name : item.label);
+function credentialInput(item, settings, name, onChange) {
+    const names = { username: 'Username', password: 'Password', token: 'Token', value: 'Value' };
+    const title = item.kind === 'bearer' && !item.tokenSource ? 'Bearer Token' : names[name];
+    const label = textElement('label', title + ':', 'signalr-credential');
     const input = document.createElement('input');
     input.type = name === 'username' ? 'text' : 'password';
     input.autocomplete = 'off';
     input.spellcheck = false;
     input.maxLength = 8192;
+    input.placeholder = names[name];
     input.value = settings.credentials[item.id]?.[name] ?? '';
     input.addEventListener('input', () => {
         settings.credentials[item.id] ??= {};
@@ -56,27 +59,119 @@ function credentialGroup(item, settings, onChange) {
         group.append(textElement('p', 'Required scopes: ' + item.scopes.join(', '), 'signalr-help'));
     }
     const names = credentialNames(item.kind);
-    group.append(...names.map(name => credentialInput(item, settings, name, names.length > 1, onChange)));
+    group.append(...names.map(name => credentialInput(item, settings, name, onChange)));
     return group;
+}
+
+function mountAuthentication(root, getSession, onChange) {
+    const section = root.querySelector('[data-authentication]');
+    const picker = root.querySelector('[data-auth-picker]');
+    const menu = root.querySelector('[data-auth-menu]');
+    const search = root.querySelector('[data-auth-search]');
+    const options = root.querySelector('[data-auth-options]');
+    const fields = root.querySelector('[data-credentials]');
+
+    function render() {
+        const { hub, settings } = getSession();
+        const auth = hub.authentication;
+        const option = auth.options.find(value => value.id === settings.authentication);
+        section.hidden = !auth.required && !option;
+        picker.hidden = !option;
+        picker.textContent = option ? 'Selected Auth Type: ' + option.label + ' ⌄' : '';
+        const required = auth.required ? 'Required' : 'Optional';
+        root.querySelector('[data-auth-required]').textContent = required;
+        root.querySelector('[data-auth-menu-label]').textContent = required + ' authentication';
+        const help = root.querySelector('[data-auth-help]');
+        help.textContent = 'No authentication scheme is documented for this hub.';
+        help.hidden = Boolean(option);
+        fields.replaceChildren(...(option?.credentials ?? []).map(item => credentialGroup(item, settings, onChange)));
+    }
+
+    function renderOptions() {
+        const { hub, settings } = getSession();
+        const query = search.value.trim().toLowerCase();
+        const choices = hub.authentication.options.filter(option => option.label.toLowerCase().includes(query));
+        options.replaceChildren(...choices.map(option => {
+            const selected = option.id === settings.authentication;
+            const button = textElement('button', (selected ? '✓ ' : '') + option.label);
+            button.type = 'button';
+            button.setAttribute('aria-pressed', String(selected));
+            button.addEventListener('click', () => {
+                settings.authentication = option.id;
+                menu.hidePopover();
+                section.querySelector('details').open = true;
+                render();
+                onChange();
+                picker.focus();
+            });
+            return button;
+        }));
+        root.querySelector('[data-no-auth]').hidden = choices.length > 0;
+    }
+
+    picker.addEventListener('click', () => {
+        if (menu.matches(':popover-open')) {
+            menu.hidePopover();
+            return;
+        }
+        search.value = '';
+        renderOptions();
+        menu.showPopover();
+        const anchor = picker.getBoundingClientRect();
+        const bounds = menu.getBoundingClientRect();
+        menu.style.left = Math.max(8, anchor.right - bounds.width) + 'px';
+        menu.style.top = Math.max(8, Math.min(anchor.bottom, window.innerHeight - bounds.height - 8)) + 'px';
+        search.focus();
+    });
+    menu.addEventListener('toggle', () => picker.setAttribute('aria-expanded', String(menu.matches(':popover-open'))));
+    search.addEventListener('input', renderOptions);
+    return { render, close: () => { if (menu.matches(':popover-open')) { menu.hidePopover(); } } };
+}
+
+function parameterField(item, settings, kind, onChange) {
+    const label = textElement('label', item.name, 'signalr-parameter');
+    const control = document.createElement(item.values?.length ? 'select' : 'input');
+    if (control instanceof HTMLSelectElement) {
+        control.append(new Option('Select value', ''), ...item.values.map(value => new Option(value, value)));
+    } else {
+        control.placeholder = 'Value';
+        control.autocomplete = 'off';
+        control.spellcheck = false;
+    }
+    if (item.required) {
+        control.setAttribute('aria-required', 'true');
+        label.append(textElement('small', 'Required'));
+    }
+    control.value = settings[kind][item.name];
+    control.addEventListener('input', () => {
+        settings[kind][item.name] = control.value;
+        onChange();
+    });
+    label.append(control);
+    if (item.description) {
+        label.append(textElement('small', item.description, 'signalr-help'));
+    }
+    return label;
 }
 
 export function mountConnectionControls(root, getSession, onChange) {
     const form = root.querySelector('#panixida-signalr-connection');
-    const authentication = form.elements.authentication;
     const transport = form.elements.transport;
-    const fields = root.querySelector('[data-credentials]');
+    const auth = mountAuthentication(root, getSession, onChange);
 
-    function renderCredentials() {
-        const { hub, settings } = getSession();
-        const option = hub.authentication.options.find(value => value.id === settings.authentication);
-        fields.replaceChildren(...(option?.credentials ?? []).map(item => credentialGroup(item, settings, onChange)));
+    function renderParameters(hub, settings, kind) {
+        const section = form.querySelector(`[data-parameters="${kind}"]`);
+        const parameters = hub.parameters[kind];
+        section.hidden = parameters.length === 0;
+        section.querySelector('[data-parameter-fields]').replaceChildren(
+            ...parameters.map(item => parameterField(item, settings, kind, onChange)));
     }
 
-    function renderPairs(kind) {
+    function renderHeaders() {
         const { settings } = getSession();
-        const container = root.querySelector(`[data-pairs="${kind}"]`);
+        const container = root.querySelector('[data-pairs="headers"]');
         container.replaceChildren();
-        for (const [index, pair] of settings[kind].entries()) {
+        for (const [index, pair] of settings.headers.entries()) {
             const row = document.createElement('div');
             row.className = 'signalr-pair';
             for (const name of ['name', 'value']) {
@@ -85,17 +180,17 @@ export function mountConnectionControls(root, getSession, onChange) {
                 input.autocomplete = 'off';
                 input.spellcheck = false;
                 input.placeholder = name === 'name' ? 'Key' : 'Value';
-                input.setAttribute('aria-label', `${kind} ${index + 1} ${name}`);
+                input.setAttribute('aria-label', `Header ${index + 1} ${name}`);
                 input.value = pair[name];
                 input.addEventListener('input', () => { pair[name] = input.value; onChange(); });
                 row.append(input);
             }
             const remove = textElement('button', '×');
             remove.type = 'button';
-            remove.setAttribute('aria-label', `Remove ${kind} ${index + 1}`);
+            remove.setAttribute('aria-label', `Remove header ${index + 1}`);
             remove.addEventListener('click', () => {
-                settings[kind].splice(index, 1);
-                renderPairs(kind);
+                settings.headers.splice(index, 1);
+                renderHeaders();
                 onChange();
             });
             row.append(remove);
@@ -103,11 +198,6 @@ export function mountConnectionControls(root, getSession, onChange) {
         }
     }
 
-    authentication.addEventListener('change', () => {
-        getSession().settings.authentication = authentication.value;
-        renderCredentials();
-        onChange();
-    });
     transport.addEventListener('change', () => {
         const { settings } = getSession();
         settings.transport = transport.value;
@@ -123,33 +213,23 @@ export function mountConnectionControls(root, getSession, onChange) {
             onChange();
         });
     }
-    for (const kind of ['headers', 'query']) {
-        root.querySelector(`[data-add="${kind}"]`).addEventListener('click', () => {
-            getSession().settings[kind].push({ name: '', value: '' });
-            renderPairs(kind);
-            onChange();
-        });
-    }
+    root.querySelector('[data-add="headers"]').addEventListener('click', () => {
+        getSession().settings.headers.push({ name: '', value: '' });
+        renderHeaders();
+        onChange();
+    });
     return {
+        close: auth.close,
         render(session) {
             const { hub, settings } = session;
-            authentication.replaceChildren(...hub.authentication.options.map(value => {
-                const option = new Option(value.label, value.id);
-                option.disabled = value.credentials.some(item => item.kind === 'unsupported');
-                return option;
-            }));
-            authentication.value = settings.authentication;
             transport.replaceChildren(...['Auto', ...hub.transports].map(value => new Option(value, value)));
             transport.value = settings.transport;
             form.elements.skipNegotiation.checked = settings.skipNegotiation;
             form.elements.withCredentials.checked = settings.withCredentials;
-            root.querySelector('[data-auth-required]').textContent = hub.authentication.required ? 'Required' : 'Optional';
-            root.querySelector('[data-auth-help]').textContent = hub.authentication.declared
-                ? 'Authentication types are read from this hub’s AsyncAPI security requirements.'
-                : 'Authentication schemes are not documented. Select credentials manually; the server decides whether to accept them.';
-            renderCredentials();
-            renderPairs('headers');
-            renderPairs('query');
+            auth.render();
+            renderHeaders();
+            renderParameters(hub, settings, 'path');
+            renderParameters(hub, settings, 'query');
         },
         setDisabled(session) {
             const idle = session.status === 'Disconnected';

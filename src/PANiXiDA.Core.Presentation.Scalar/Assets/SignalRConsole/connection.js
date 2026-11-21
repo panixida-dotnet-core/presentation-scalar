@@ -2,10 +2,31 @@ import { resolveDocumentNode } from './schema.js';
 
 export const transportNames = ['WebSockets', 'ServerSentEvents', 'LongPolling'];
 
+const pathParameterPattern = /\{([^{}/]+)\}/gu;
+const managedQuery = /^(?:id|access_token|negotiateVersion|useStatefulReconnect)$/iu;
+
+function parameter(name, schema, required) {
+    return { name, required, description: schema?.description,
+        values: Array.isArray(schema?.enum) ? schema.enum.map(String) : undefined,
+        defaultValue: String(schema?.default ?? '') };
+}
+
+export function getConnectionParameters(document, channel) {
+    const path = [...new Set(Array.from(channel.address.matchAll(pathParameterPattern), match => match[1]))]
+        .map(name => parameter(name, resolveDocumentNode(document, channel.parameters?.[name]), true));
+    const binding = resolveDocumentNode(document, channel.bindings)?.ws;
+    const query = resolveDocumentNode(document, binding?.query);
+    return {
+        path,
+        query: Object.entries(query?.properties ?? {}).filter(([name]) => !managedQuery.test(name))
+            .map(([name, schema]) => parameter(name, resolveDocumentNode(document, schema), query.required?.includes(name) === true))
+    };
+}
+
 function credential(document, reference) {
     const scheme = resolveDocumentNode(document, reference);
     if (!scheme) {
-        return { id: 'unresolved', label: 'Unresolved authentication scheme', kind: 'unsupported' };
+        return null;
     }
     const id = reference.$ref ?? JSON.stringify(scheme);
     const label = scheme.title ?? reference.$ref?.split('/').at(-1) ?? scheme.scheme ?? scheme.type;
@@ -17,7 +38,9 @@ function credential(document, reference) {
     } else if (scheme.type === 'httpApiKey' && ['query', 'header', 'cookie'].includes(scheme.in)) {
         kind = scheme.in === 'cookie' ? 'cookie' : 'apiKey';
     }
-    return { id, label, kind, location: scheme.in, name: scheme.name, description: scheme.description,
+    const description = scheme.description ?? (scheme.type === 'http' && kind === 'bearer'
+        ? 'Access token without the Bearer prefix.' : undefined);
+    return { id, label, kind, location: scheme.in, name: scheme.name, description,
         scopes: scheme.scopes ?? [], tokenSource: ['oauth2', 'openIdConnect'].includes(scheme.type) };
 }
 
@@ -32,28 +55,25 @@ export function getAuthenticationOptions(document, operation, channel) {
         ? combinations.flatMap(values => operationSecurity.slice(0, 32).map(value => [...values, value])) : combinations;
     const declared = serverSecurity.length > 0 || operationSecurity.length > 0;
     const required = declared || operation.bindings?.['x-signalr']?.authorizationRequired === true;
-    const options = alternatives.filter(values => values.length > 0).slice(0, 32).map(values => {
-        const credentials = [...new Map(values.map(value => {
-            const item = credential(document, value);
-            return [item.id, item];
-        })).values()];
-        return { id: credentials.map(value => value.id).join(' + '),
-            label: credentials.map(value => value.label).join(' + '), credentials };
+    const options = alternatives.slice(0, 32).flatMap(values => {
+        const items = values.map(value => credential(document, value));
+        if (!items.length || items.includes(null)) {
+            return [];
+        }
+        const credentials = [...new Map(items.map(item => [item.id, item])).values()];
+        return [{ id: credentials.map(value => value.id).join(' + '),
+            label: credentials.map(value => value.label).join(' + '), credentials }];
     });
-    if (!declared) {
-        options.push(
-            { id: 'bearer', label: 'Bearer', credentials: [{ id: 'bearer', label: 'Bearer token', kind: 'bearer' }] },
-            { id: 'cookie', label: 'Browser cookies', credentials: [{ id: 'cookie', label: 'Browser cookies', kind: 'cookie' }] }
-        );
-    }
-    const anonymous = { id: 'none', label: 'No explicit authentication', credentials: [] };
-    required ? options.push(anonymous) : options.unshift(anonymous);
     return { options, required, declared };
 }
 
 export function createSettings(hub) {
-    return { authentication: hub.authentication.options[0].id, credentials: {}, transport: 'Auto',
-        skipNegotiation: false, withCredentials: true, headers: [], query: [] };
+    const options = hub.authentication.options;
+    const selected = options.find(option => option.credentials.every(item => item.kind !== 'unsupported')) ?? options[0];
+    const defaults = parameters => Object.fromEntries((parameters ?? []).map(item => [item.name, item.defaultValue]));
+    return { authentication: selected?.id, credentials: {}, transport: 'Auto',
+        skipNegotiation: false, withCredentials: true, headers: [],
+        path: defaults(hub.parameters?.path), query: defaults(hub.parameters?.query) };
 }
 
 function readPairs(pairs, kind) {
@@ -97,13 +117,38 @@ function connectionHeaders(pairs) {
     return headers;
 }
 
-function connectionUrl(hub, pairs) {
-    const url = new URL(hub.url);
-    for (const { name, value } of readPairs(pairs, 'Query parameters')) {
-        if (/^(?:id|access_token|negotiateVersion|useStatefulReconnect)$/iu.test(name)) {
-            throw new Error('The ' + name + ' query parameter is managed by SignalR.');
+function parameterValue(item, values) {
+    const value = values[item.name];
+    if (!value && item.required) {
+        throw new Error('Enter a value for ' + item.name + '.');
+    }
+    if (value && item.values?.length && !item.values.includes(value)) {
+        throw new Error('Select a documented value for ' + item.name + '.');
+    }
+    return value;
+}
+
+export function connectionPath(hub, settings) {
+    let path = hub.url.pathname;
+    for (const item of hub.parameters?.path ?? []) {
+        const value = parameterValue(item, settings.path);
+        if (value === '.' || value === '..' || /[/\\\p{Cc}]/u.test(value)) {
+            throw new Error('Enter a single path segment for ' + item.name + '.');
         }
-        url.searchParams.append(name, value);
+        const placeholder = new URL('/{' + item.name + '}', hub.url).pathname.slice(1);
+        path = path.replaceAll(placeholder, encodeURIComponent(value));
+    }
+    return path;
+}
+
+export function connectionAddress(hub, settings) {
+    const url = new URL(hub.url);
+    url.pathname = connectionPath(hub, settings);
+    for (const item of hub.parameters?.query ?? []) {
+        const value = parameterValue(item, settings.query);
+        if (value && !managedQuery.test(item.name)) {
+            url.searchParams.set(item.name, value);
+        }
     }
     return url;
 }
@@ -206,14 +251,14 @@ function validateCredentials(state, settings) {
 
 export function prepareConnection(hub, settings, placeholders = false) {
     const authentication = hub.authentication.options.find(option => option.id === settings.authentication);
-    if (!authentication) {
+    if (!authentication && hub.authentication.options.length) {
         throw new Error('Select an authentication type.');
     }
     validateTransport(hub, settings);
-    const state = { url: connectionUrl(hub, settings.query), headers: connectionHeaders(settings.headers),
-        secrets: [...settings.headers, ...settings.query].map(value => value.value), token: undefined,
+    const state = { url: connectionAddress(hub, settings), headers: connectionHeaders(settings.headers),
+        secrets: [...settings.headers.map(pair => pair.value), ...Object.values(settings.query)], token: undefined,
         headerAuthentication: false, cookieAuthentication: false };
-    for (const item of authentication.credentials) {
+    for (const item of authentication?.credentials ?? []) {
         applyCredential(item, settings.credentials[item.id] ?? {}, state, placeholders);
     }
     validateCredentials(state, settings);

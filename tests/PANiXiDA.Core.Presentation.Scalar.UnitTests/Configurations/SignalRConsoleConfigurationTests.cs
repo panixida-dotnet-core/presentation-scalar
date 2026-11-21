@@ -41,7 +41,9 @@ public sealed class SignalRConsoleConfigurationTests
         page.ShouldNotContain("data-open");
         page.ShouldNotContain("name=\"hub\"");
         page.ShouldContain("aria-label=\"Close SignalR Test Request\"");
-        page.ShouldContain("name=\"authentication\"");
+        page.ShouldContain("aria-controls=\"panixida-signalr-auth-options\"");
+        page.ShouldContain("data-parameters=\"path\"");
+        page.ShouldContain("data-parameters=\"query\"");
         page.ShouldContain("name=\"transport\"");
         page.ShouldContain("Code Snippet");
         script.StatusCode.ShouldBe(HttpStatusCode.OK);

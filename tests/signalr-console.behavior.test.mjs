@@ -2,13 +2,17 @@ import assert from 'node:assert/strict';
 import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 
-import { createSettings, getAuthenticationOptions, negotiationDetails, prepareConnection, redact } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/connection.js';
+import { createSettings, getAuthenticationOptions, getConnectionParameters, negotiationDetails, prepareConnection, redact } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/connection.js';
 import { getArgumentSchemas, getMessageSchemas, replyReturnsValue } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/schema.js';
 import { clients, codeTokens, generateSnippet } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/snippets.js';
 
 function hub(authentication = getAuthenticationOptions({}, {}, {})) {
     return { url: new URL('https://example.com/gateway/hub'), transports: ['WebSockets', 'ServerSentEvents', 'LongPolling'],
         authentication, events: new Map([['changed', { target: 'Changed', argumentCount: 2 }]]) };
+}
+
+function bearerHub() {
+    return hub(getAuthenticationOptions({}, { security: [{ type: 'http', scheme: 'bearer', title: 'Bearer' }] }, {}));
 }
 
 function session() {
@@ -96,27 +100,64 @@ test('AsyncAPI server and operation security requirements are combined, while al
     assert.equal(new URL(prepared.url).searchParams.get('api_key'), 'a+b&c');
 });
 
-test('Legacy authorization metadata preserves Bearer and offers explicit unauthenticated testing', () => {
+test('Authorization flags without security schemes do not invent authentication options', () => {
     const authentication = getAuthenticationOptions({}, { bindings: { 'x-signalr': { authorizationRequired: true } } }, {});
-    assert.equal(authentication.options[0].id, 'bearer');
-    assert.equal(authentication.options.at(-1).id, 'none');
+    assert.deepEqual(authentication.options, []);
+    assert.equal(authentication.required, true);
     assert.equal(authentication.declared, false);
+    assert.deepEqual(bearerHub().authentication.options.map(option => option.label), ['Bearer']);
 });
 
-test('Connection settings preserve allowed transports, HTTP headers and encoded query values', () => {
-    const endpoint = hub();
+test('Documented variables and query fields determine the URL for connections and snippets', () => {
+    const channel = {
+        address: '/hubs/{tenant}/events/{tenant}',
+        parameters: { tenant: { $ref: '#/components/parameters/Tenant' } },
+        bindings: { ws: { query: { $ref: '#/components/schemas/Query' } } }
+    };
+    const document = { components: {
+        parameters: { Tenant: { enum: ['EU west #1', 'APAC'], default: 'EU west #1' } },
+        schemas: { Query: { type: 'object', required: ['search'], properties: {
+            search: { type: 'string' }, language: { type: 'string', default: 'en' },
+            access_token: { type: 'string' }
+        } } }
+    } };
+    const value = session();
+    const endpoint = value.hub;
+    endpoint.url = new URL('/gateway' + channel.address, 'https://example.com');
+    endpoint.parameters = getConnectionParameters(document, channel);
+    value.settings = createSettings(endpoint);
+    const settings = value.settings;
     endpoint.transports = ['LongPolling'];
-    const settings = createSettings(endpoint);
     settings.headers = [{ name: 'X-Tenant', value: 'tenant-one' }];
-    settings.query = [{ name: 'search', value: 'one + two & three' }];
+    assert.throws(() => prepareConnection(endpoint, settings), /Enter a value for search/);
+    settings.query.search = 'one + two & three';
+    settings.query.access_token = 'ignored';
     const prepared = prepareConnection(endpoint, settings);
+    const url = new URL(prepared.url);
     assert.deepEqual(prepared.transports, ['LongPolling']);
     assert.deepEqual(prepared.headers, { 'X-Tenant': 'tenant-one' });
-    assert.equal(new URL(prepared.url).searchParams.get('search'), 'one + two & three');
-    assert.equal(prepared.skipNegotiation, false);
+    assert.equal(url.pathname, '/gateway/hubs/EU%20west%20%231/events/EU%20west%20%231');
+    assert.deepEqual([...url.searchParams], [['search', 'one + two & three'], ['language', 'en']]);
+    assert.ok(generateSnippet('javascript', value).includes(prepared.url));
+    settings.path.tenant = 'unknown';
+    assert.throws(() => prepareConnection(endpoint, settings), /Select a documented value for tenant/);
 });
 
-test('Browser-forbidden headers, duplicate names and SignalR-owned query parameters fail before connecting', () => {
+test('A route variable is required and cannot change the structure of the endpoint path', () => {
+    const endpoint = hub();
+    const channel = { address: '/hubs/{name}/events' };
+    endpoint.url = new URL(channel.address, 'https://example.com');
+    endpoint.parameters = getConnectionParameters({}, channel);
+    const settings = createSettings(endpoint);
+    assert.deepEqual(endpoint.parameters.query, []);
+    assert.throws(() => prepareConnection(endpoint, settings), /Enter a value for name/);
+    for (const name of ['..', 'a/b', 'a\\b']) {
+        settings.path.name = name;
+        assert.throws(() => prepareConnection(endpoint, settings), /single path segment/);
+    }
+});
+
+test('Browser-forbidden headers and duplicate names fail before connecting', () => {
     const endpoint = hub();
     for (const headers of [
         [{ name: 'Cookie', value: 'session=secret' }],
@@ -126,8 +167,6 @@ test('Browser-forbidden headers, duplicate names and SignalR-owned query paramet
     ]) {
         assert.throws(() => prepareConnection(endpoint, { ...createSettings(endpoint), headers }));
     }
-    assert.throws(() => prepareConnection(endpoint, { ...createSettings(endpoint),
-        query: [{ name: 'access_token', value: 'secret' }] }), /managed by SignalR/);
 });
 
 test('Header authentication requires LongPolling and skip negotiation requires explicit WebSockets', () => {
@@ -156,10 +195,9 @@ test('Negotiation diagnostics remove connection and access tokens, including nes
 });
 
 test('Credential redaction covers Bearer prefixes and form-encoded opaque values', () => {
-    const endpoint = hub();
+    const endpoint = bearerHub();
     const settings = createSettings(endpoint);
-    settings.authentication = 'bearer';
-    settings.credentials.bearer = { token: 'Bearer token+value' };
+    settings.credentials[settings.authentication] = { token: 'Bearer token+value' };
     const prepared = prepareConnection(endpoint, settings);
     assert.equal(prepared.token, 'token+value');
     assert.equal(redact('token%2Bvalue', prepared.secrets), '[redacted]');
@@ -206,8 +244,9 @@ for (const client of ['javascript', 'typescript']) {
 
 test('Every client uses credential placeholders and generates the selected method and connection settings', () => {
     const value = session();
-    value.settings.authentication = 'bearer';
-    value.settings.credentials.bearer = { token: 'never-copy-this-token' };
+    value.hub = bearerHub();
+    value.settings = createSettings(value.hub);
+    value.settings.credentials[value.settings.authentication] = { token: 'never-copy-this-token' };
     value.settings.transport = 'WebSockets';
     value.settings.skipNegotiation = true;
     for (const client of clients) {

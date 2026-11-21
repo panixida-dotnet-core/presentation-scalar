@@ -1,27 +1,33 @@
 <dialog aria-labelledby="panixida-signalr-title">
     <header class="signalr-header">
-        <div class="signalr-endpoint">
-            <h2 id="panixida-signalr-title">SignalR Test Request</h2>
-            <code data-address></code>
+        <div class="signalr-address-bar">
+            <span class="signalr-protocol">SignalR</span>
+            <div class="signalr-endpoint"><code data-origin></code> <code data-address></code></div>
+            <button type="button" data-copy-address aria-label="Copy hub URL" title="Copy hub URL">⧉</button>
+            <button type="submit" form="panixida-signalr-connection" data-connect data-primary>Connect</button>
+            <button type="button" data-disconnect hidden>Disconnect</button>
         </div>
-        <div class="signalr-connection">
-            <div class="signalr-actions">
-                <button type="submit" form="panixida-signalr-connection" data-connect data-primary>Connect</button>
-                <button type="button" data-disconnect hidden>Disconnect</button>
-                <button type="button" data-hide autofocus aria-label="Close SignalR Test Request" title="Close the window and keep the connection. Use Disconnect to end it.">Close</button>
-            </div>
-            <output data-status>Disconnected</output>
-        </div>
+        <button type="button" data-hide autofocus aria-label="Close SignalR Test Request" title="Close the window and keep the connection. Use Disconnect to end it.">Close</button>
     </header>
     <div class="signalr-columns">
         <div class="signalr-controls">
             <div class="signalr-settings">
+                <div class="signalr-request-summary">
+                    <h2 id="panixida-signalr-title">SignalR Test Request</h2>
+                    <output data-status>Disconnected</output>
+                </div>
                 <form id="panixida-signalr-connection">
-                    <details class="signalr-section" open>
-                        <summary>Authentication <span data-auth-required></span></summary>
-                        <label>Selected Auth Type <select name="authentication"></select></label>
-                        <p class="signalr-help" data-auth-help></p>
-                        <div class="signalr-fields" data-credentials></div>
+                    <div class="signalr-auth" data-authentication hidden>
+                        <details class="signalr-section" open>
+                            <summary>Authentication <span data-auth-required></span></summary>
+                            <p class="signalr-help" data-auth-help hidden></p>
+                            <div data-credentials></div>
+                        </details>
+                        <button type="button" data-auth-picker aria-controls="panixida-signalr-auth-options" aria-expanded="false" hidden></button>
+                    </div>
+                    <details class="signalr-section signalr-parameters" data-parameters="path" open hidden>
+                        <summary>Variables</summary>
+                        <div data-parameter-fields></div>
                     </details>
                     <details class="signalr-section">
                         <summary>Connection settings</summary>
@@ -37,10 +43,9 @@
                         <div data-pairs="headers"></div>
                         <button type="button" data-add="headers">Add header</button>
                     </details>
-                    <details class="signalr-section">
-                        <summary>Query parameters</summary>
-                        <div data-pairs="query"></div>
-                        <button type="button" data-add="query">Add query parameter</button>
+                    <details class="signalr-section signalr-parameters" data-parameters="query" open hidden>
+                        <summary>Query Parameters</summary>
+                        <div data-parameter-fields></div>
                     </details>
                 </form>
                 <form class="signalr-section" data-command hidden>
@@ -84,6 +89,12 @@
                 <ol></ol>
             </div>
         </section>
+    </div>
+    <div class="signalr-client-menu signalr-auth-menu" id="panixida-signalr-auth-options" data-auth-menu popover>
+        <input type="search" data-auth-search aria-label="Search authentication types" autocomplete="off">
+        <small data-auth-menu-label></small>
+        <section aria-label="Authentication types" data-auth-options></section>
+        <p data-no-auth hidden>No matching authentication types.</p>
     </div>
     <div class="signalr-client-menu" id="panixida-signalr-clients" data-client-menu popover>
         <label>Search clients <input type="search" data-client-search autocomplete="off"></label>
