@@ -106,9 +106,18 @@ html:has(#panixida-signalr-console dialog[open]) {
 }
 
 #panixida-signalr-console .signalr-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-width: 0;
+    min-height: 0;
+    border-right: 1px solid var(--console-border);
+}
+
+#panixida-signalr-console .signalr-settings {
+    min-width: 0;
     overflow: auto;
     overscroll-behavior: contain;
-    border-right: 1px solid var(--console-border);
 }
 
 #panixida-signalr-console .signalr-section {
@@ -123,6 +132,58 @@ html:has(#panixida-signalr-console dialog[open]) {
     display: grid;
     gap: 0.375rem;
     font-weight: 500;
+}
+
+#panixida-signalr-console summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#panixida-signalr-console details.signalr-section:not([open]) > :not(summary) {
+    display: none;
+}
+
+#panixida-signalr-console .signalr-help,
+#panixida-signalr-console .signalr-type,
+#panixida-signalr-console [data-auth-required] {
+    color: var(--console-secondary);
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+#panixida-signalr-console .signalr-fields {
+    display: grid;
+    gap: 0.75rem;
+}
+
+#panixida-signalr-console label.signalr-check {
+    display: flex;
+    align-items: center;
+}
+
+#panixida-signalr-console .signalr-check input {
+    width: auto;
+}
+
+#panixida-signalr-console .signalr-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 0.35rem;
+    margin-bottom: 0.35rem;
+}
+
+#panixida-signalr-console .signalr-schema {
+    margin: 0.5rem 0 0.5rem 0.75rem;
+    padding-left: 0.65rem;
+    border-left: 1px solid var(--console-border);
+}
+
+#panixida-signalr-console .signalr-schema :is(summary, div):first-child {
+    overflow-wrap: anywhere;
+}
+
+#panixida-signalr-console .signalr-type {
+    margin-left: 0.5rem;
 }
 
 #panixida-signalr-console :is(button, input, select, textarea),
@@ -253,6 +314,97 @@ html:has(#panixida-signalr-console dialog[open]) {
     white-space: pre-wrap;
 }
 
+#panixida-signalr-console .signalr-snippet {
+    min-width: 0;
+    min-height: 0;
+    border-top: 1px solid var(--console-border);
+    background: var(--console-surface);
+}
+
+#panixida-signalr-console .signalr-snippet > summary {
+    padding: 0.75rem 1.25rem;
+}
+
+#panixida-signalr-console .signalr-snippet-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem 0.5rem;
+}
+
+#panixida-signalr-console .signalr-snippet-toolbar label {
+    display: flex;
+    align-items: center;
+    font-size: 0.75rem;
+}
+
+#panixida-signalr-console [data-client] {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 0.75rem;
+}
+
+#panixida-signalr-console .signalr-snippet > :is(p, output) {
+    display: block;
+    padding: 0 1.25rem 0.5rem;
+}
+
+#panixida-signalr-console .signalr-snippet > pre {
+    box-sizing: border-box;
+    max-width: 100%;
+    max-height: 15rem;
+    overflow: auto;
+    margin: 0;
+    border-radius: 0;
+    white-space: pre;
+    background: var(--console-background);
+    tab-size: 4;
+}
+
+#panixida-signalr-console .signalr-code-comment { color: var(--console-secondary); }
+#panixida-signalr-console .signalr-code-string { color: var(--console-green); }
+#panixida-signalr-console .signalr-code-keyword { color: var(--console-accent); }
+#panixida-signalr-console .signalr-code-number { color: var(--scalar-color-orange, #c58642); }
+
+#panixida-signalr-console .signalr-client-menu {
+    position: fixed;
+    inset: auto;
+    box-sizing: border-box;
+    width: min(21rem, calc(100vw - 1rem));
+    max-height: min(22rem, calc(100dvh - 1rem));
+    overflow: auto;
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--console-border);
+    border-radius: var(--scalar-radius, 6px);
+    background: var(--console-background);
+    color: var(--console-text);
+    box-shadow: 0 8px 32px #0005;
+}
+
+#panixida-signalr-console .signalr-client-menu:popover-open {
+    display: grid;
+    gap: 0.5rem;
+}
+
+#panixida-signalr-console .signalr-client-menu button {
+    display: grid;
+    gap: 0.25rem;
+    width: 100%;
+    margin-top: 0.35rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+#panixida-signalr-console .signalr-client-menu button[aria-pressed="true"] {
+    border-color: var(--console-accent);
+}
+
+#panixida-signalr-console .signalr-client-menu small {
+    color: var(--console-secondary);
+}
+
 .signalr-test-request {
     flex: 0 0 auto;
     font-size: var(--scalar-small, 0.875rem);
@@ -269,8 +421,12 @@ html:has(#panixida-signalr-console dialog[open]) {
     }
 
     #panixida-signalr-console .signalr-controls {
-        overflow: visible;
+        display: block;
         border-right: 0;
+    }
+
+    #panixida-signalr-console .signalr-settings {
+        overflow: visible;
     }
 
     #panixida-signalr-console .signalr-journal {

@@ -30,6 +30,10 @@ internal static partial class SignalRConsoleConfiguration
     {
         MapAsset(app, "console.js", MediaTypeNames.Text.JavaScript);
         MapAsset(app, "requests.js", MediaTypeNames.Text.JavaScript);
+        MapAsset(app, "connection.js", MediaTypeNames.Text.JavaScript);
+        MapAsset(app, "schema.js", MediaTypeNames.Text.JavaScript);
+        MapAsset(app, "snippets.js", MediaTypeNames.Text.JavaScript);
+        MapAsset(app, "view.js", MediaTypeNames.Text.JavaScript);
         MapAsset(app, "console.css", MediaTypeNames.Text.Css);
         MapAsset(app, "signalr.min.js", MediaTypeNames.Text.JavaScript);
     }

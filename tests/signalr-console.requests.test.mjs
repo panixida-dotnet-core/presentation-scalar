@@ -76,10 +76,10 @@ test('Each SignalR channel exposes its own callable methods and observed events'
     assert.deepEqual([...chat.methods.keys()], ['echo', 'upload']);
     assert.equal(upload.method.streamResult, true);
     assert.deepEqual(upload.method.inputStreams, ['values']);
-    assert.deepEqual([...updates.events.values()], ['ChangedAsync']);
+    assert.deepEqual([...updates.events.values()].map(value => value.target), ['ChangedAsync']);
     assert.equal(updates.methods.size, 0);
     assert.equal(requests.has('first/channel/chatv1/operation/item'), false);
     assert.equal(requests.has('first/channel/updates/operation/changed'), false);
-    assert.equal(requests.has('first/channel/unsupported'), false);
+    assert.deepEqual(requests.get('first/channel/unsupported').hub.transports, ['ServerSentEvents']);
     assert.notEqual(chat, requests.get('second/channel/chatv1').hub);
 });

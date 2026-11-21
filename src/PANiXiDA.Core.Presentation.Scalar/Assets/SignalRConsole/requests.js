@@ -1,3 +1,6 @@
+import { getAuthenticationOptions, transportNames } from './connection.js';
+import { getArgumentSchemas, getMessageSchemas, readPointer, replyReturnsValue, resolveDocumentNode } from './schema.js';
+
 const channelHeaderSelector = '.section[id] > .section-header-wrapper';
 const operationHeaderSelector = '.operation--receive[id] > .operation-header';
 const headerSelector = channelHeaderSelector + ', ' + operationHeaderSelector;
@@ -24,6 +27,45 @@ export function getDocumentPaths(sources) {
     return [...paths].filter(([, path]) => path !== null);
 }
 
+function updateHub(hub, binding, document, operation, channel) {
+    hub.transports = transportNames.filter(value => hub.transports.includes(value) || binding.transports.includes(value));
+    const authentication = getAuthenticationOptions(document, operation, channel);
+    hub.authentication.required ||= authentication.required;
+    hub.authentication.declared ||= authentication.declared;
+    hub.authentication.options = [...new Map([...hub.authentication.options, ...authentication.options]
+        .map(value => [value.id, value])).values()];
+    if (hub.authentication.declared) {
+        hub.authentication.options = hub.authentication.options.filter(value => !['bearer', 'cookie'].includes(value.id));
+    }
+    if (hub.authentication.required) {
+        hub.authentication.options.sort((left, right) => Number(left.id === 'none') - Number(right.id === 'none'));
+    }
+}
+
+function registerOperation(requests, hub, anchor, operationId, document, operation) {
+    const binding = operation.bindings['x-signalr'];
+    const target = binding.target;
+    const key = target.toLowerCase();
+    if (operation.action === 'receive' && binding.messageType !== 'streamItem') {
+        const method = {
+            target,
+            title: operation.title ?? target,
+            streamResult: binding.streamResult === true,
+            inputStreams: Array.isArray(binding.inputStreams) ? binding.inputStreams : [],
+            messages: getMessageSchemas(document, operation),
+            returnsValue: replyReturnsValue(document, operation),
+            arguments: () => getRequestArguments(document, operation)
+        };
+        hub.methods.set(key, method);
+        registerRequest(requests, anchor + '/operation/' + scalarSlug(operationId), { hub, method });
+    } else if (operation.action === 'send') {
+        const messages = getMessageSchemas(document, operation);
+        const counts = new Set(messages.map(value => getArgumentSchemas(value).length));
+        hub.events.set(key, { target, title: operation.title ?? target, description: operation.description,
+            messages, argumentCount: counts.size === 1 ? [...counts][0] : null });
+    }
+}
+
 export function addDocumentRequests(requests, slug, document, getUrl) {
     const channelPrefix = '#/channels/';
     const hubs = new Map();
@@ -32,7 +74,7 @@ export function addDocumentRequests(requests, slug, document, getUrl) {
         const binding = operation?.bindings?.['x-signalr'];
         const reference = operation?.channel?.$ref;
         if (!Array.isArray(binding?.protocols) || !binding.protocols.includes('json') ||
-            !Array.isArray(binding.transports) || !binding.transports.includes('WebSockets') ||
+            !Array.isArray(binding.transports) || !binding.transports.some(value => transportNames.includes(value)) ||
             typeof reference !== 'string' || !reference.startsWith(channelPrefix) ||
             typeof binding.target !== 'string' || !binding.target.trim()) {
             continue;
@@ -52,6 +94,8 @@ export function addDocumentRequests(requests, slug, document, getUrl) {
                 url,
                 address: channel.address,
                 title: channel.title?.trim() || channel.summary?.trim() || channel.address,
+                transports: [],
+                authentication: { options: [], required: false, declared: false },
                 methods: new Map(),
                 events: new Map()
             };
@@ -59,21 +103,9 @@ export function addDocumentRequests(requests, slug, document, getUrl) {
             registerRequest(requests, anchor, { hub });
         }
 
-        const target = binding.target;
-        const key = target.toLowerCase();
-        if (operation.action === 'receive' && binding.messageType !== 'streamItem') {
-            const method = {
-                target,
-                title: operation.title ?? target,
-                streamResult: binding.streamResult === true,
-                inputStreams: Array.isArray(binding.inputStreams) ? binding.inputStreams : [],
-                arguments: () => getRequestArguments(document, operation)
-            };
-            hub.methods.set(key, method);
-            registerRequest(requests, anchor + '/operation/' + scalarSlug(operationId), { hub, method });
-        } else if (operation.action === 'send') {
-            hub.events.set(key, target);
-        }
+        updateHub(hub, binding, document, operation, channel);
+
+        registerOperation(requests, hub, anchor, operationId, document, operation);
     }
 }
 
@@ -178,30 +210,6 @@ function asArguments(value) {
     return Array.isArray(value?.arguments) ? value.arguments : undefined;
 }
 
-function resolveDocumentNode(document, value) {
-    const visited = new Set();
-    while (typeof value?.$ref === 'string' && !visited.has(value)) {
-        visited.add(value);
-        value = readPointer(document, value.$ref);
-    }
-
-    return value;
-}
-
-function readPointer(root, reference) {
-    if (reference === '#') {
-        return root;
-    }
-    if (!reference.startsWith('#/')) {
-        return undefined;
-    }
-
-    return reference.slice(2).split('/').reduce((value, token) => {
-        const key = token.replaceAll('~1', '/').replaceAll('~0', '~');
-        return value != null && Object.hasOwn(value, key) ? value[key] : undefined;
-    }, root);
-}
-
 function providedExample(schema) {
     return [schema?.example, schema?.examples?.[0], schema?.default, schema?.const, schema?.enum?.[0]]
         .find(value => value !== undefined);
@@ -218,8 +226,9 @@ function createExample(schema, root, document, parents = new Set()) {
     }
     const path = new Set(parents).add(schema);
     const nestedExample = value => createExample(value, root, document, path);
-    if (typeof schema.$ref === 'string') {
-        const resolved = readPointer(root, schema.$ref) ?? readPointer(document, schema.$ref);
+    const reference = schema.$ref ?? schema.$dynamicRef;
+    if (typeof reference === 'string') {
+        const resolved = readPointer(root, reference) ?? readPointer(document, reference);
         return nestedExample(resolved);
     }
 
