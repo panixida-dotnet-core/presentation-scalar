@@ -258,7 +258,7 @@ function codeTokenKind(text) {
 }
 
 export function codeTokens(code) {
-    const expression = /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/[^\n]*|\b[A-Za-z_]\w*\b|\b\d+\b)/gu;
+    const expression = /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\/[^\n]*|\w+)/gu;
     const tokens = [];
     let position = 0;
     for (const match of code.matchAll(expression)) {

@@ -42,6 +42,30 @@ function updateHub(hub, binding, document, operation, channel) {
     }
 }
 
+function registerOperation(requests, hub, anchor, operationId, document, operation) {
+    const binding = operation.bindings['x-signalr'];
+    const target = binding.target;
+    const key = target.toLowerCase();
+    if (operation.action === 'receive' && binding.messageType !== 'streamItem') {
+        const method = {
+            target,
+            title: operation.title ?? target,
+            streamResult: binding.streamResult === true,
+            inputStreams: Array.isArray(binding.inputStreams) ? binding.inputStreams : [],
+            messages: getMessageSchemas(document, operation),
+            returnsValue: replyReturnsValue(document, operation),
+            arguments: () => getRequestArguments(document, operation)
+        };
+        hub.methods.set(key, method);
+        registerRequest(requests, anchor + '/operation/' + scalarSlug(operationId), { hub, method });
+    } else if (operation.action === 'send') {
+        const messages = getMessageSchemas(document, operation);
+        const counts = new Set(messages.map(value => getArgumentSchemas(value).length));
+        hub.events.set(key, { target, title: operation.title ?? target, description: operation.description,
+            messages, argumentCount: counts.size === 1 ? [...counts][0] : null });
+    }
+}
+
 export function addDocumentRequests(requests, slug, document, getUrl) {
     const channelPrefix = '#/channels/';
     const hubs = new Map();
@@ -81,26 +105,7 @@ export function addDocumentRequests(requests, slug, document, getUrl) {
 
         updateHub(hub, binding, document, operation, channel);
 
-        const target = binding.target;
-        const key = target.toLowerCase();
-        if (operation.action === 'receive' && binding.messageType !== 'streamItem') {
-            const method = {
-                target,
-                title: operation.title ?? target,
-                streamResult: binding.streamResult === true,
-                inputStreams: Array.isArray(binding.inputStreams) ? binding.inputStreams : [],
-                messages: getMessageSchemas(document, operation),
-                returnsValue: replyReturnsValue(document, operation),
-                arguments: () => getRequestArguments(document, operation)
-            };
-            hub.methods.set(key, method);
-            registerRequest(requests, anchor + '/operation/' + scalarSlug(operationId), { hub, method });
-        } else if (operation.action === 'send') {
-            const messages = getMessageSchemas(document, operation);
-            const counts = new Set(messages.map(value => getArgumentSchemas(value).length));
-            hub.events.set(key, { target, title: operation.title ?? target, description: operation.description,
-                messages, argumentCount: counts.size === 1 ? [...counts][0] : null });
-        }
+        registerOperation(requests, hub, anchor, operationId, document, operation);
     }
 }
 
