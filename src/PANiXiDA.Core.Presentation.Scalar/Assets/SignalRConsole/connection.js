@@ -157,6 +157,7 @@ function applyCredential(item, values, state, placeholders) {
         case 'bearer':
             requireAuthorizationSlot(state);
             state.token = read('token', 'YOUR_ACCESS_TOKEN').replace(/^Bearer\s+/iu, '');
+            state.secrets.push(state.token);
             break;
         case 'basic': {
             requireAuthorizationSlot(state);
@@ -167,7 +168,7 @@ function applyCredential(item, values, state, placeholders) {
             }
             const encoded = btoa(String.fromCodePoint(...new TextEncoder().encode(username + ':' + password)));
             state.headers.Authorization = 'Basic ' + encoded;
-            state.secrets.push(state.headers.Authorization);
+            state.secrets.push(state.headers.Authorization, encoded);
             state.headerAuthentication = true;
             break;
         }
@@ -225,7 +226,8 @@ export function prepareConnection(hub, settings, placeholders = false) {
 export function redact(text, secrets) {
     let result = String(text);
     for (const secret of secrets.filter(Boolean).sort((left, right) => right.length - left.length)) {
-        for (const value of new Set([secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1, -1)])) {
+        const formEncoded = new URLSearchParams({ secret }).toString().slice('secret='.length);
+        for (const value of new Set([secret, encodeURIComponent(secret), formEncoded, JSON.stringify(secret).slice(1, -1)])) {
             result = result.replaceAll(value, '[redacted]');
         }
     }

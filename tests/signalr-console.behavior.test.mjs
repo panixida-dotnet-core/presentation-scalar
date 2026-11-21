@@ -155,6 +155,17 @@ test('Negotiation diagnostics remove connection and access tokens, including nes
     assert.equal(redact('secret%2Bvalue secret+value', ['secret+value']), '[redacted] [redacted]');
 });
 
+test('Credential redaction covers Bearer prefixes and form-encoded opaque values', () => {
+    const endpoint = hub();
+    const settings = createSettings(endpoint);
+    settings.authentication = 'bearer';
+    settings.credentials.bearer = { token: 'Bearer token+value' };
+    const prepared = prepareConnection(endpoint, settings);
+    assert.equal(prepared.token, 'token+value');
+    assert.equal(redact('token%2Bvalue', prepared.secrets), '[redacted]');
+    assert.equal(redact('secret+with+spaces', ['secret with spaces']), '[redacted]');
+});
+
 for (const client of ['javascript', 'typescript']) {
     test(`${client} snippets register callbacks before starting and preserve multiple upload streams`, async () => {
         const value = session();
