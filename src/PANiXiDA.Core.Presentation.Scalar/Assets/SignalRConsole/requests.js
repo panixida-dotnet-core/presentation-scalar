@@ -1,4 +1,4 @@
-import { getAuthenticationOptions, transportNames } from './connection.js';
+import { getAuthenticationOptions, getConnectionParameters, transportNames } from './connection.js';
 import { getArgumentSchemas, getMessageSchemas, readPointer, replyReturnsValue, resolveDocumentNode } from './schema.js';
 
 const channelHeaderSelector = '.section[id] > .section-header-wrapper';
@@ -34,12 +34,6 @@ function updateHub(hub, binding, document, operation, channel) {
     hub.authentication.declared ||= authentication.declared;
     hub.authentication.options = [...new Map([...hub.authentication.options, ...authentication.options]
         .map(value => [value.id, value])).values()];
-    if (hub.authentication.declared) {
-        hub.authentication.options = hub.authentication.options.filter(value => !['bearer', 'cookie'].includes(value.id));
-    }
-    if (hub.authentication.required) {
-        hub.authentication.options.sort((left, right) => Number(left.id === 'none') - Number(right.id === 'none'));
-    }
 }
 
 function registerOperation(requests, hub, anchor, operationId, document, operation) {
@@ -94,6 +88,7 @@ export function addDocumentRequests(requests, slug, document, getUrl) {
                 url,
                 address: channel.address,
                 title: channel.title?.trim() || channel.summary?.trim() || channel.address,
+                parameters: getConnectionParameters(document, channel),
                 transports: [],
                 authentication: { options: [], required: false, declared: false },
                 methods: new Map(),
