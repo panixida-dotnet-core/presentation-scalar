@@ -9,7 +9,6 @@ import { createSettings, getAuthenticationOptions } from '../src/PANiXiDA.Core.P
 import { generateSnippet } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/snippets.js';
 
 const workspace = mkdtempSync(join(tmpdir(), 'signalr-snippets-'));
-assert.equal(dirname(workspace), resolve(tmpdir()));
 const dotnetDirectory = join(workspace, 'dotnet');
 const javaDirectory = join(workspace, 'java');
 const jars = join(javaDirectory, 'jars');
@@ -65,6 +64,7 @@ function example(target, security, transport = 'Auto') {
 }
 
 test('Generated C# and Java examples compile against their SignalR SDKs', async () => {
+    assert.equal(dirname(workspace), resolve(tmpdir()));
     try {
         const project = join(dotnetDirectory, 'Snippet.csproj');
         writeFileSync(project, `<Project Sdk="Microsoft.NET.Sdk">
@@ -85,10 +85,10 @@ test('Generated C# and Java examples compile against their SignalR SDKs', async 
         ];
         for (const [index, value] of examples.entries()) {
             writeFileSync(join(dotnetDirectory, 'Program.cs'), generateSnippet('csharp', value));
-            run('dotnet', ['build', project, '--no-restore', '--configuration', 'Release']);
+            assert.doesNotThrow(() => run('dotnet', ['build', project, '--no-restore', '--configuration', 'Release']));
             const java = join(javaDirectory, 'SignalRExample.java');
             writeFileSync(java, generateSnippet('java', value));
-            run(javac, ['-cp', join(jars, '*'), '-d', javaDirectory, java]);
+            assert.doesNotThrow(() => run(javac, ['-cp', join(jars, '*'), '-d', javaDirectory, java]));
             process.stdout.write(`Compiled C# and Java example ${index + 1}: ${value.method.target}\n`);
         }
     } finally {
