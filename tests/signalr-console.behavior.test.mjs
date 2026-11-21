@@ -108,6 +108,24 @@ test('Authorization flags without security schemes do not invent authentication 
     assert.deepEqual(bearerHub().authentication.options.map(option => option.label), ['Bearer']);
 });
 
+test('Clearing the Bearer selection prepares a connection and snippet without the saved token', () => {
+    const endpoint = bearerHub();
+    const settings = createSettings(endpoint);
+    const bearer = settings.authentication;
+    settings.credentials[bearer] = { token: 'example-token' };
+
+    assert.equal(prepareConnection(endpoint, settings).token, 'example-token');
+    settings.authentication = undefined;
+    const connection = prepareConnection(endpoint, settings);
+    assert.equal(connection.token, undefined);
+    assert.equal(connection.headers.Authorization, undefined);
+    assert.deepEqual(connection.secrets, []);
+    assert.equal(prepareConnection(endpoint, settings, true).token, undefined);
+
+    settings.authentication = bearer;
+    assert.equal(prepareConnection(endpoint, settings).token, 'example-token');
+});
+
 test('Documented variables and query fields determine the URL for connections and snippets', () => {
     const channel = {
         address: '/hubs/{tenant}/events/{tenant}',

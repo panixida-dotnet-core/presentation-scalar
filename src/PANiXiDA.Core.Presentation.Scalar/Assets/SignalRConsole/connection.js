@@ -251,7 +251,7 @@ function validateCredentials(state, settings) {
 
 export function prepareConnection(hub, settings, placeholders = false) {
     const authentication = hub.authentication.options.find(option => option.id === settings.authentication);
-    if (!authentication && hub.authentication.options.length) {
+    if (!authentication && settings.authentication !== undefined) {
         throw new Error('Select an authentication type.');
     }
     validateTransport(hub, settings);

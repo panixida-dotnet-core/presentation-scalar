@@ -75,14 +75,16 @@ function mountAuthentication(root, getSession, onChange) {
         const { hub, settings } = getSession();
         const auth = hub.authentication;
         const option = auth.options.find(value => value.id === settings.authentication);
-        section.hidden = !auth.required && !option;
-        picker.hidden = !option;
-        picker.textContent = option ? 'Selected Auth Type: ' + option.label + ' ⌄' : '';
+        section.hidden = !auth.required && auth.options.length === 0;
+        picker.hidden = auth.options.length === 0;
+        picker.textContent = option ? 'Selected Auth Type: ' + option.label : 'Select Auth Type';
         const required = auth.required ? 'Required' : 'Optional';
         root.querySelector('[data-auth-required]').textContent = required;
         root.querySelector('[data-auth-menu-label]').textContent = required + ' authentication';
         const help = root.querySelector('[data-auth-help]');
-        help.textContent = 'No authentication scheme is documented for this hub.';
+        help.textContent = auth.options.length
+            ? 'No authentication selected.'
+            : 'No authentication scheme is documented for this hub.';
         help.hidden = Boolean(option);
         fields.replaceChildren(...(option?.credentials ?? []).map(item => credentialGroup(item, settings, onChange)));
     }
@@ -92,19 +94,23 @@ function mountAuthentication(root, getSession, onChange) {
         const query = search.value.trim().toLowerCase();
         const choices = hub.authentication.options.filter(option => option.label.toLowerCase().includes(query));
         options.replaceChildren(...choices.map(option => {
-            const selected = option.id === settings.authentication;
-            const button = textElement('button', (selected ? '✓ ' : '') + option.label);
-            button.type = 'button';
-            button.setAttribute('aria-pressed', String(selected));
-            button.addEventListener('click', () => {
-                settings.authentication = option.id;
-                menu.hidePopover();
+            const label = textElement('label', '', 'signalr-auth-option');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = option.id === settings.authentication;
+            checkbox.addEventListener('change', () => {
+                settings.authentication = checkbox.checked ? option.id : undefined;
+                for (const other of options.querySelectorAll('input')) {
+                    if (other !== checkbox) {
+                        other.checked = false;
+                    }
+                }
                 section.querySelector('details').open = true;
                 render();
                 onChange();
-                picker.focus();
             });
-            return button;
+            label.append(checkbox, textElement('span', option.label));
+            return label;
         }));
         root.querySelector('[data-no-auth]').hidden = choices.length > 0;
     }
