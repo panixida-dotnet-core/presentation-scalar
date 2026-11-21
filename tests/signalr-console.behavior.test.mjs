@@ -5,6 +5,29 @@ import test from 'node:test';
 import { createSettings, getAuthenticationOptions, getConnectionParameters, negotiationDetails, prepareConnection, redact } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/connection.js';
 import { getArgumentSchemas, getMessageSchemas, replyReturnsValue } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/schema.js';
 import { clients, codeTokens, generateSnippet } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/snippets.js';
+import { mountCopyFeedback } from '../src/PANiXiDA.Core.Presentation.Scalar/Assets/SignalRConsole/view.js';
+
+test('Copy feedback is refreshed by a repeated copy and cleared when the console closes', t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const status = { textContent: '' };
+    const dialog = Object.assign(new EventTarget(), { open: true, querySelector: () => status });
+    const show = mountCopyFeedback(dialog);
+
+    show();
+    assert.equal(status.textContent, 'Copied to the clipboard');
+    t.mock.timers.tick(2000);
+    show();
+    t.mock.timers.tick(2000);
+    assert.equal(status.textContent, 'Copied to the clipboard');
+    t.mock.timers.tick(1000);
+    assert.equal(status.textContent, '');
+
+    show();
+    dialog.open = false;
+    dialog.dispatchEvent(new Event('close'));
+    show();
+    assert.equal(status.textContent, '');
+});
 
 function hub(authentication = getAuthenticationOptions({}, {}, {})) {
     return { url: new URL('https://example.com/gateway/hub'), transports: ['WebSockets', 'ServerSentEvents', 'LongPolling'],

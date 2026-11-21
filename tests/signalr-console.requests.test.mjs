@@ -92,11 +92,12 @@ test('SignalR uses a versioned document slug and the published channel title', (
     const address = '/api/v1/match-searches/state';
     const requests = new Map();
     addDocumentRequests(requests, source[0], {
-        channels: { [address]: { address, title: 'Matchmaking SignalR' } },
-        operations: { 'read-state': operation('~1api~1v1~1match-searches~1state', 'receive', 'ReadState') }
+        channels: { 'match-searches-state': { address, title: 'Matchmaking' } },
+        operations: { 'read-state': operation('match-searches-state', 'receive', 'ReadState') }
     }, path => new URL(path, 'https://example.com'));
 
-    const request = requests.get('matchmaking-signalr-v1/channel/apiv1match-searchesstate/operation/read-state');
-    assert.equal(request.hub.title, 'Matchmaking SignalR');
+    const request = requests.get('matchmaking-signalr-v1/channel/match-searches-state/operation/read-state');
+    assert.equal(request.hub.title, 'Matchmaking');
+    assert.equal(request.hub.url.href, 'https://example.com' + address);
     assert.equal(request.method.target, 'ReadState');
 });

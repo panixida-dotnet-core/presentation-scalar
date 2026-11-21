@@ -131,6 +131,8 @@ Click **Test Request** beside a SignalR channel heading or a callable hub method
 
 The connection bar shows the server and hub path. **Variables** appears for path placeholders in the channel address and uses `channel.parameters` for descriptions, defaults and allowed values. **Query Parameters** appears when `channel.bindings.ws.query.properties` declares query fields. Both feed the connection URL and Code Snippet. API key schemes use the Authentication section.
 
+Copying the hub URL or a code snippet shows a brief clipboard confirmation.
+
 **Connection settings** exposes Auto or a documented transport, optional negotiation skipping for explicit WebSockets, HTTP browser credentials, and custom headers. Connect performs negotiation automatically. **Messages** includes the negotiation status and response with connection/access tokens redacted. Basic and header API-key authentication require LongPolling in the browser. Custom headers can reach negotiation and HTTP transports, but browser WebSocket/SSE APIs cannot attach them to the transport connection. Cookies follow browser domain and SameSite rules; the HTTP credentials option does not control WebSocket cookies. Browser-forbidden headers and SignalR-owned query parameters cannot be overridden.
 
 The method button selects the documented method and fills in arguments from a message example or payload schema. Choose another method of the same hub to prepare its arguments while keeping the connection and message history. After connecting, use **Invoke** to see a reply, **Send** for a one-way command, or **Stream** for a streaming method. Supply one JSON array per input stream when the method accepts uploads.
