@@ -2,7 +2,7 @@ import { resolveDocumentNode } from './schema.js';
 
 export const transportNames = ['WebSockets', 'ServerSentEvents', 'LongPolling'];
 
-const pathParameterPattern = /\{([^{}\/]+)\}/gu;
+const pathParameterPattern = /\{([^{}/]+)\}/gu;
 const managedQuery = /^(?:id|access_token|negotiateVersion|useStatefulReconnect)$/iu;
 
 function parameter(name, schema, required) {
@@ -132,7 +132,7 @@ export function connectionPath(hub, settings) {
     let path = hub.url.pathname;
     for (const item of hub.parameters?.path ?? []) {
         const value = parameterValue(item, settings.path);
-        if (value === '.' || value === '..' || /[\/\\\p{Cc}]/u.test(value)) {
+        if (value === '.' || value === '..' || /[/\\\p{Cc}]/u.test(value)) {
             throw new Error('Enter a single path segment for ' + item.name + '.');
         }
         const placeholder = new URL('/{' + item.name + '}', hub.url).pathname.slice(1);
