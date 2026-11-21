@@ -1,4 +1,6 @@
 import { addDocumentRequests, addTestRequests, getDocumentPaths } from './requests.js';
+import { createSettings, negotiationDetails, prepareConnection, redact } from './connection.js';
+import { mountConnectionControls, mountSnippet, renderEvents } from './view.js';
 
 const connected = 'Connected';
 const disconnected = 'Disconnected';
@@ -73,6 +75,7 @@ function selectMethod(session, method) {
     session.method = method;
     session.arguments = JSON.stringify(method.arguments(), null, 2);
     session.uploads = JSON.stringify(method.inputStreams.map(() => []), null, 2);
+    session.action = 'invoke';
 }
 
 function mountConsole(root, requests) {
@@ -81,12 +84,10 @@ function mountConsole(root, requests) {
     const address = root.querySelector('[data-address]');
     const connectionForm = root.querySelector('#panixida-signalr-connection');
     const commandForm = root.querySelector('[data-command]');
-    const tokenInput = connectionForm.elements.token;
     const methodSelect = commandForm.elements.method;
     const argumentsInput = commandForm.elements.arguments;
     const uploadsInput = commandForm.elements.uploads;
     const uploadsField = root.querySelector('[data-uploads]');
-    const events = root.querySelector('[data-events]');
     const journal = root.querySelector('.signalr-journal');
     const messages = journal.querySelector('ol');
     const emptyLog = journal.querySelector('[data-empty]');
@@ -98,13 +99,18 @@ function mountConsole(root, requests) {
     const sessions = new Map();
     let current;
     let opener;
+    const controls = mountConnectionControls(root, () => current, () => {
+        updateStatus(current);
+        snippet.render();
+    });
+    const snippet = mountSnippet(root, () => current);
 
-    function write(session, kind, target, value, token = '') {
+    function write(session, kind, target, value, secrets = session.secrets ?? []) {
         const entry = {
             kind,
-            target: redact(target, token),
+            target: redact(target, secrets),
             time: new Date(),
-            payload: value === undefined ? undefined : redact(JSON.stringify(value, null, 2), token).slice(0, 16384)
+            payload: value === undefined ? undefined : redact(JSON.stringify(value, null, 2), secrets).slice(0, 16384)
         };
         session.entries.push(entry);
         const trim = session.entries.length > 150;
@@ -132,9 +138,9 @@ function mountConsole(root, requests) {
 
         const ready = session.status === connected;
         const idle = session.status === disconnected;
-        statusOutput.textContent = ready ? 'Connected · JSON · WebSockets' : session.status;
+        statusOutput.textContent = ready ? 'Connected · JSON · ' + session.settings.transport : session.status;
         statusOutput.dataset.connected = String(ready);
-        tokenInput.disabled = !idle;
+        controls.setDisabled(session);
         connect.hidden = ready || session.status === 'Disconnecting…';
         connect.disabled = !idle;
         connect.textContent = session.status === 'Connecting…' ? session.status : 'Connect';
@@ -159,12 +165,13 @@ function mountConsole(root, requests) {
         invoke.textContent = method?.streamResult ? 'Stream' : 'Invoke';
         send.hidden = method?.streamResult === true;
         updateStatus(session);
+        snippet.render();
     }
 
     function openRequest({ hub, method }, trigger) {
         let session = sessions.get(hub);
         if (!session) {
-            session = { hub, status: disconnected, connection: null, token: '', entries: [] };
+            session = { hub, status: disconnected, connection: null, settings: createSettings(hub), secrets: [], entries: [] };
             sessions.set(hub, session);
         }
 
@@ -177,17 +184,10 @@ function mountConsole(root, requests) {
         opener = trigger;
         title.textContent = hub.title;
         address.textContent = hub.url.href;
-        tokenInput.value = session.token;
+        controls.render(session);
         commandForm.hidden = hub.methods.size === 0;
         methodSelect.replaceChildren(...Array.from(hub.methods, ([key, item]) => new Option(item.title, key)));
-        events.replaceChildren(...Array.from(hub.events.values(), target => {
-            const entry = document.createElement('li');
-            const name = document.createElement('code');
-            name.textContent = target;
-            entry.append(name);
-            return entry;
-        }));
-        root.querySelector('[data-no-events]').hidden = hub.events.size > 0;
+        renderEvents(root, hub);
         messages.replaceChildren(...session.entries.map(createEntry));
         renderMethod(session);
 
@@ -206,18 +206,44 @@ function mountConsole(root, requests) {
 
         session.status = 'Connecting…';
         updateStatus(session);
-        session.token = tokenInput.value;
-        const token = bearerToken(session.token);
         const { hub } = session;
         let candidate;
         try {
+            const prepared = prepareConnection(hub, session.settings);
+            session.secrets = prepared.secrets;
             const signalR = await loadSignalR();
             const protocol = observeCallbacks(signalR,
-                message => write(session, 'Event', message.target, message.arguments, token));
+                message => write(session, 'Event', message.target, message.arguments));
+            const client = new signalR.DefaultHttpClient(signalR.NullLogger.instance);
+            class DiagnosticHttpClient extends signalR.HttpClient {
+                async send(request) {
+                    const negotiation = new URL(request.url).pathname.endsWith('/negotiate');
+                    try {
+                        const response = await client.send(request);
+                        if (negotiation) {
+                            write(session, 'Negotiation', hub.address, negotiationDetails(response));
+                        }
+                        return response;
+                    } catch (error) {
+                        if (negotiation) {
+                            write(session, 'Negotiation', hub.address, { statusCode: error.statusCode, error: error.message });
+                        }
+                        throw error;
+                    }
+                }
+
+                getCookieString(url) {
+                    return client.getCookieString(url);
+                }
+            }
             candidate = new signalR.HubConnectionBuilder()
-                .withUrl(hub.url.href, {
-                    transport: signalR.HttpTransportType.WebSockets,
-                    accessTokenFactory: () => token
+                .withUrl(prepared.url, {
+                    transport: prepared.transports.reduce((value, name) => value | signalR.HttpTransportType[name], 0),
+                    accessTokenFactory: prepared.token ? () => prepared.token : undefined,
+                    headers: prepared.headers,
+                    skipNegotiation: prepared.skipNegotiation,
+                    withCredentials: prepared.withCredentials,
+                    httpClient: new DiagnosticHttpClient()
                 })
                 .withHubProtocol(protocol)
                 .configureLogging(signalR.LogLevel.None)
@@ -230,7 +256,7 @@ function mountConsole(root, requests) {
                 session.connection = null;
                 session.status = disconnected;
                 write(session, error ? 'Error' : 'Connection', hub.address,
-                    error ? error.message : disconnected, token);
+                    error ? error.message : disconnected);
                 updateStatus(session);
             });
 
@@ -243,7 +269,7 @@ function mountConsole(root, requests) {
             if (!candidate || session.connection === candidate) {
                 session.connection = null;
                 session.status = disconnected;
-                write(session, 'Error', hub.address, error.message, token);
+                write(session, 'Error', hub.address, error.message);
             }
         }
 
@@ -263,7 +289,7 @@ function mountConsole(root, requests) {
             await connection.stop();
         } catch (error) {
             if (session.connection === connection) {
-                write(session, 'Error', session.hub.address, error.message, bearerToken(session.token));
+                write(session, 'Error', session.hub.address, error.message);
                 session.status = connected;
                 updateStatus(session);
             }
@@ -279,20 +305,21 @@ function mountConsole(root, requests) {
         }
 
         const { target } = method;
-        const token = bearerToken(session.token);
-        const fail = error => write(session, 'Error', target, error.message, token);
+        const fail = error => write(session, 'Error', target, error.message);
         try {
             const args = readArray(session.arguments, 'Arguments');
             const uploads = createUploads(window.signalR, session.uploads, method.inputStreams);
             const parameters = args.concat(uploads.map(upload => upload.subject));
             const sendOnly = event.submitter?.value === 'send';
+            session.action = sendOnly ? 'send' : 'invoke';
+            snippet.render();
             const command = sendOnly ? 'Send' : 'Invoke';
             const connection = session.connection;
 
-            write(session, method.streamResult ? 'Stream' : command, target, args, token);
+            write(session, method.streamResult ? 'Stream' : command, target, args);
             if (method.streamResult) {
                 connection.stream(target, ...parameters).subscribe({
-                    next: item => write(session, 'Stream item', target, item, token),
+                    next: item => write(session, 'Stream item', target, item),
                     complete: () => write(session, 'Stream completed', target),
                     error: fail
                 });
@@ -303,7 +330,7 @@ function mountConsole(root, requests) {
                     : connection.invoke(target, ...parameters);
                 publishUploads(uploads);
                 const result = await pending;
-                write(session, sendOnly ? 'Sent' : 'Reply', target, result, token);
+                write(session, sendOnly ? 'Sent' : 'Reply', target, result);
             }
         } catch (error) {
             fail(error);
@@ -312,7 +339,8 @@ function mountConsole(root, requests) {
 
     root.querySelector('[data-hide]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('close', () => {
-        if (!dialog.open && opener.isConnected) {
+        snippet.close();
+        if (!dialog.open && opener?.isConnected) {
             opener.focus({ preventScroll: true });
         }
     });
@@ -328,26 +356,10 @@ function mountConsole(root, requests) {
         selectMethod(current, current.hub.methods.get(methodSelect.value));
         renderMethod(current);
     });
-    tokenInput.addEventListener('input', () => { current.token = tokenInput.value; });
-    argumentsInput.addEventListener('input', () => { current.arguments = argumentsInput.value; });
-    uploadsInput.addEventListener('input', () => { current.uploads = uploadsInput.value; });
+    argumentsInput.addEventListener('input', () => { current.arguments = argumentsInput.value; snippet.render(); });
+    uploadsInput.addEventListener('input', () => { current.uploads = uploadsInput.value; snippet.render(); });
     root.hidden = false;
     addTestRequests(requests, openRequest);
-}
-
-function bearerToken(value) {
-    return value.trim().replace(/^Bearer\s+/i, '');
-}
-
-function redact(text, token) {
-    if (!token) {
-        return text;
-    }
-    const variants = new Set([token, encodeURIComponent(token), JSON.stringify(token).slice(1, -1)]);
-    for (const variant of variants) {
-        text = text.replaceAll(variant, '[redacted]');
-    }
-    return text;
 }
 
 let signalRLoad;

@@ -40,6 +40,10 @@ public sealed class SignalRConsoleConfigurationTests
         page.ShouldContain("<h2 id=\"panixida-signalr-title\">SignalR Test Request</h2>");
         page.ShouldNotContain("data-open");
         page.ShouldNotContain("name=\"hub\"");
+        page.ShouldContain("aria-label=\"Close SignalR Test Request\"");
+        page.ShouldContain("name=\"authentication\"");
+        page.ShouldContain("name=\"transport\"");
+        page.ShouldContain("Code Snippet");
         script.StatusCode.ShouldBe(HttpStatusCode.OK);
         script.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.JavaScript);
         requests.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -49,6 +53,13 @@ public sealed class SignalRConsoleConfigurationTests
         signalR.StatusCode.ShouldBe(HttpStatusCode.OK);
         signalR.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.JavaScript);
         (await signalR.Content.ReadAsStringAsync(cancellationToken)).ShouldContain("HubConnectionBuilder");
+
+        foreach (var name in new[] { "connection.js", "schema.js", "snippets.js", "view.js" })
+        {
+            using var asset = await client.GetAsync($"{ConsolePath}/{name}", cancellationToken);
+            asset.StatusCode.ShouldBe(HttpStatusCode.OK);
+            asset.Content.Headers.ContentType?.MediaType.ShouldBe(MediaTypeNames.Text.JavaScript);
+        }
     }
 
     [Fact(DisplayName = "An OpenAPI-only Scalar page does not load SignalR console assets")]

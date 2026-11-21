@@ -8,33 +8,71 @@
             <div class="signalr-actions">
                 <button type="submit" form="panixida-signalr-connection" data-connect data-primary>Connect</button>
                 <button type="button" data-disconnect hidden>Disconnect</button>
-                <button type="button" data-hide autofocus aria-label="Minimize SignalR Test Request and keep the connection">Minimize</button>
+                <button type="button" data-hide autofocus aria-label="Close SignalR Test Request" title="Close the window and keep the connection. Use Disconnect to end it.">Close ✕</button>
             </div>
             <output data-status>Disconnected</output>
         </div>
     </header>
     <div class="signalr-columns">
         <div class="signalr-controls">
-            <form id="panixida-signalr-connection" class="signalr-section">
-                <h3>Authentication</h3>
-                <label>Bearer token <input name="token" type="password" autocomplete="off" spellcheck="false"></label>
-            </form>
-            <form class="signalr-section" data-command hidden>
-                <label>Hub method <select name="method"></select></label>
-                <label>Arguments (JSON array) <textarea name="arguments" rows="5" spellcheck="false"></textarea></label>
-                <label data-uploads hidden>Upload streams (JSON arrays)<span></span>
-                    <textarea name="uploads" rows="3" spellcheck="false"></textarea>
-                </label>
-                <div class="signalr-actions">
-                    <button type="submit" value="invoke" data-primary disabled>Invoke</button>
-                    <button type="submit" value="send" disabled>Send</button>
+            <div class="signalr-settings">
+                <form id="panixida-signalr-connection">
+                    <details class="signalr-section" open>
+                        <summary>Authentication <span data-auth-required></span></summary>
+                        <label>Selected Auth Type <select name="authentication"></select></label>
+                        <p class="signalr-help" data-auth-help></p>
+                        <div class="signalr-fields" data-credentials></div>
+                    </details>
+                    <details class="signalr-section">
+                        <summary>Connection settings</summary>
+                        <label>Transport <select name="transport"></select></label>
+                        <label class="signalr-check"><input name="skipNegotiation" type="checkbox"> Skip negotiation (WebSockets only)</label>
+                        <label class="signalr-check"><input name="withCredentials" type="checkbox" checked> Send browser credentials with HTTP requests</label>
+                        <p class="signalr-help">WebSocket cookies are managed by the browser. HTTP credentials do not control WebSocket cookies.</p>
+                        <p class="signalr-help">Connect runs negotiate automatically unless it is skipped. Its result appears in Messages with secret tokens hidden.</p>
+                    </details>
+                    <details class="signalr-section">
+                        <summary>Headers</summary>
+                        <p class="signalr-help">Custom headers apply to negotiate and LongPolling. Browser WebSocket and SSE connections cannot send custom headers.</p>
+                        <div data-pairs="headers"></div>
+                        <button type="button" data-add="headers">Add header</button>
+                    </details>
+                    <details class="signalr-section">
+                        <summary>Query parameters</summary>
+                        <div data-pairs="query"></div>
+                        <button type="button" data-add="query">Add query parameter</button>
+                    </details>
+                </form>
+                <form class="signalr-section" data-command hidden>
+                    <label>Hub method <select name="method"></select></label>
+                    <label>Arguments (JSON array) <textarea name="arguments" rows="5" spellcheck="false"></textarea></label>
+                    <label data-uploads hidden>Upload streams (JSON arrays)<span></span>
+                        <textarea name="uploads" rows="3" spellcheck="false"></textarea>
+                    </label>
+                    <div class="signalr-actions">
+                        <button type="submit" value="invoke" data-primary disabled>Invoke</button>
+                        <button type="submit" value="send" disabled>Send</button>
+                    </div>
+                </form>
+                <section class="signalr-section" aria-labelledby="panixida-signalr-events">
+                    <h3 id="panixida-signalr-events">Server events</h3>
+                    <p data-no-events hidden>No server events are documented for this hub.</p>
+                    <ul data-events></ul>
+                </section>
+            </div>
+            <details class="signalr-snippet" data-snippet>
+                <summary>Code Snippet</summary>
+                <div class="signalr-snippet-toolbar">
+                    <button type="button" data-client aria-haspopup="listbox" aria-expanded="false">JavaScript / @microsoft/signalr</button>
+                    <label data-snippet-action-label>Call type <select data-snippet-action aria-label="Snippet call type">
+                        <option value="invoke">Invoke</option><option value="send">Send</option>
+                    </select></label>
+                    <button type="button" data-copy>Copy code</button>
                 </div>
-            </form>
-            <section class="signalr-section" aria-labelledby="panixida-signalr-events">
-                <h3 id="panixida-signalr-events">Server events</h3>
-                <p data-no-events hidden>No server events are documented for this hub.</p>
-                <ul data-events></ul>
-            </section>
+                <p class="signalr-help">Authentication secrets are placeholders. Browser cookies must be supplied separately in native clients.</p>
+                <p class="signalr-help" data-snippet-error role="status" hidden></p>
+                <pre tabindex="0" aria-label="SignalR code snippet"><code data-code></code></pre>
+            </details>
         </div>
         <section class="signalr-journal" aria-labelledby="panixida-signalr-messages">
             <header>
@@ -46,5 +84,10 @@
                 <ol></ol>
             </div>
         </section>
+    </div>
+    <div class="signalr-client-menu" data-client-menu popover>
+        <label>Search clients <input type="search" data-client-search autocomplete="off"></label>
+        <div role="listbox" aria-label="SignalR clients" data-client-options></div>
+        <p data-no-clients hidden>No matching clients.</p>
     </div>
 </dialog>

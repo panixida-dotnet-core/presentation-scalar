@@ -22,8 +22,17 @@ jobs:
           registry-user: ${{ secrets.REGISTRY_USER }}
           registry-token: ${{ secrets.REGISTRY_TOKEN }}
 
+    signalr-tests:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: node --test tests/signalr-console.*.test.mjs
+
     sonar:
-        needs: tests
+        needs: [ tests, signalr-tests ]
         uses: PANiXiDA-Infrastructure/ci-cd/.github/workflows/dotnet-sonar.yml@main
         with:
           project-key: ${{ vars.SONAR_PROJECT_KEY }}
@@ -37,6 +46,7 @@ jobs:
       needs: 
         - format
         - tests
+        - signalr-tests
         - sonar
       uses: PANiXiDA-Infrastructure/ci-cd/.github/workflows/dotnet-publish-global-nuget.yml@main
       secrets:

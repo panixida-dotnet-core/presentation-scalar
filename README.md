@@ -21,7 +21,7 @@ The presenter owns the UI and AsyncAPI document endpoints. It has no dependency 
 - One document selector for modules, transports, and contract versions.
 - OpenAPI and AsyncAPI rendering through Scalar.
 - AsyncAPI JSON endpoints at each source's configured path.
-- Contextual Test Request for documented SignalR WebSocket hubs and methods.
+- Contextual Test Request for documented SignalR hubs and methods, with authentication, connection settings, event schemas, and client code snippets.
 - Development-only availability by default, with an explicit environment override.
 - Page title, application-owned favicon, and HTTP operation sorting.
 - Shared source-generated JSON schema contexts for transport adapters.
@@ -125,11 +125,17 @@ HTTP owns module/version discovery through `HttpModules`. SignalR owns hub metad
 
 ### SignalR Test Request
 
-Click **Test Request** beside a SignalR channel heading or a callable hub method in Scalar. The dialog uses that channel’s fixed, same-origin address and supports hubs that advertise WebSockets and the SignalR JSON protocol. Enter a bearer token if required, then click **Connect**. The page keeps the token in memory and sends it through the SignalR client's authentication flow.
+Click **Test Request** beside a SignalR channel heading or a callable hub method in Scalar. The dialog uses that channel’s fixed, same-origin address and supports the SignalR JSON protocol over documented WebSockets, Server-Sent Events, and Long Polling transports. Choose authentication and connection settings, then click **Connect**. Credentials remain in page memory.
+
+**Authentication** reads referenced operation and server security schemes from AsyncAPI. Supported credentials include Bearer, issued OAuth2/OpenID Connect access tokens, Basic, HTTP API keys, and existing browser cookies. Server and operation requirements are combined; alternatives remain selectable. OAuth login and refresh flows are not performed by this console. Unsupported schemes are identified rather than treated as Bearer. Older documents that only contain `x-signalr.authorizationRequired` keep manual Bearer, browser-cookie, and no-explicit-authentication choices; the server always enforces authentication.
+
+**Connection settings** exposes Auto or a documented transport, optional negotiation skipping for explicit WebSockets, HTTP browser credentials, custom headers, and query parameters. Connect performs negotiation automatically. **Messages** includes the negotiation status and response with connection/access tokens redacted. Basic and header API-key authentication require LongPolling in the browser. Custom headers can reach negotiation and HTTP transports, but browser WebSocket/SSE APIs cannot attach them to the transport connection. Cookies follow browser domain and SameSite rules; the HTTP credentials option does not control WebSocket cookies. Browser-forbidden headers and SignalR-owned query parameters cannot be overridden.
 
 The method button selects the documented method and fills in arguments from a message example or payload schema. Choose another method of the same hub to prepare its arguments while keeping the connection and message history. After connecting, use **Invoke** to see a reply, **Send** for a one-way command, or **Stream** for a streaming method. Supply one JSON array per input stream when the method accepts uploads.
 
-**Server events** lists documented callbacks, including for hubs that only publish events. Incoming callbacks, replies, stream items, and errors appear in **Messages**. Use **Minimize** or press Escape to return to the reference while the hub stays connected. For example, you can make a related HTTP request, then reopen **Test Request** on the same hub to see the events it sent. Each hub keeps its own connection and history until the page is reloaded. Use **Disconnect** to end that hub’s connection.
+**Server events** expands each callback's documented arguments, DTO names and nested properties, including nullable values, required fields, enums, multiple DTOs, and recursive references. Incoming callbacks, replies, stream items, and errors appear in **Messages**. Use **Close** or press Escape to return to the reference while the hub stays connected. For example, you can make a related HTTP request, then reopen **Test Request** on the same hub to see the events it sent. Each hub keeps its own connection and history until the page is reloaded. Use **Disconnect** to end that hub’s connection.
+
+**Code Snippet** provides a searchable language/client selector, syntax highlighting, and copying for JavaScript, TypeScript (`@microsoft/signalr`), C# (`Microsoft.AspNetCore.SignalR.Client`), and Java (`com.microsoft.signalr`). Examples follow the selected hub, authentication, transport, method, arguments, call type, and upload streams. Event handlers are registered before starting the connection. Authentication credentials use placeholders, and native clients require their own cookies. Java does not support SSE or callbacks with more than eight arguments; unsupported selections show an explanation instead of invalid code. Snippets require the corresponding client dependency in the consuming project.
 
 The package serves the `@microsoft/signalr` 10.0.11 browser bundle locally. The bundle comes from `dist/browser/signalr.min.js` in the npm package. The vendored copy omits the source map reference and decrements the loop index after removing a stream in `HubConnection._replaceStreamingParams` so consecutive upload streams are all extracted.
 
@@ -233,10 +239,10 @@ dotnet format
 dotnet test --configuration Release
 ```
 
-Run the SignalR request catalog tests with Node.js 22 or later:
+Run the SignalR console tests with Node.js 24 or later:
 
 ```shell
-node --test tests/signalr-console.requests.test.mjs
+node --test tests/signalr-console.*.test.mjs
 ```
 
 ### Coverage
